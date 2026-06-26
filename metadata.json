@@ -1,0 +1,6 @@
+{
+  "name": "Protocol",
+  "description": "A highly interactive, visual replica and live interface of the Protocol system, featuring advanced search filters, support desk, real-time auctions, and admin control panels.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
