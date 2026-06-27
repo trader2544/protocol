@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Gavel, Clock, Trophy, RefreshCw } from 'lucide-react';
 import { AuctionItem, UserProfile } from '../types';
+import { updateAuctionBid, updateUserProfile } from '../utils/dbService';
 
 interface AuctionViewProps {
   auctions: AuctionItem[];
@@ -72,7 +73,7 @@ export default function AuctionView({ auctions, setAuctions, user, setUser, onAd
     return () => clearInterval(rivalBidTimer);
   }, [auctions, onAddToast]);
 
-  const handlePlaceBid = (itemId: string) => {
+  const handlePlaceBid = async (itemId: string) => {
     const item = auctions.find(a => a.id === itemId);
     if (!item) return;
 
@@ -89,23 +90,31 @@ export default function AuctionView({ auctions, setAuctions, user, setUser, onAd
       return;
     }
 
-    // Bid successful!
-    setUser(prev => ({ ...prev, balance: prev.balance - bidVal }));
+    try {
+      const newBalance = user.balance - bidVal;
+      await updateUserProfile(user.email, { balance: newBalance });
+      await updateAuctionBid(itemId, bidVal, item.bidsCount + 1, bidVal);
 
-    setAuctions(prev => prev.map(a => {
-      if (a.id === itemId) {
-        return {
-          ...a,
-          currentBid: bidVal,
-          myBid: bidVal,
-          bidsCount: a.bidsCount + 1,
-        };
-      }
-      return a;
-    }));
+      setUser(prev => ({ ...prev, balance: newBalance }));
 
-    onAddToast(`Placed bid of $${bidVal.toFixed(2)} on BIN ${item.card.bin}!`, 'success');
-    setBidInputs(prev => ({ ...prev, [itemId]: '' }));
+      setAuctions(prev => prev.map(a => {
+        if (a.id === itemId) {
+          return {
+            ...a,
+            currentBid: bidVal,
+            myBid: bidVal,
+            bidsCount: a.bidsCount + 1,
+          };
+        }
+        return a;
+      }));
+
+      onAddToast(`Placed bid of $${bidVal.toFixed(2)} on BIN ${item.card.bin}!`, 'success');
+      setBidInputs(prev => ({ ...prev, [itemId]: '' }));
+    } catch (err) {
+      console.error("Error placing live bid:", err);
+      alert("Failed to place live bid.");
+    }
   };
 
   return (

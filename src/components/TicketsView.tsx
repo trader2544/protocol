@@ -57,7 +57,37 @@ export default function TicketsView({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
+    <div className="flex flex-col gap-4 text-xs">
+      {/* Dynamic telegram escalation / support links */}
+      <div className="bg-[#e2f0fd]/50 border border-[#b8daff] text-[#004085] p-3 rounded-sm flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">💬</span>
+          <div>
+            <h4 className="font-extrabold text-xs uppercase tracking-wider text-gray-900">Need Immediate Assistance? Connect on Telegram</h4>
+            <p className="font-semibold text-gray-600 mt-0.5">We offer 24/7 dedicated escalation queues and a vibrant community group directly on Telegram.</p>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <a
+            href="https://t.me/mariafq"
+            target="_blank"
+            rel="noreferrer"
+            className="bg-[#24a1de] hover:bg-[#1a82b4] text-white px-3 py-1.5 rounded font-extrabold text-[10px] uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all text-center"
+          >
+            ✈️ Escalation Support (@mariafq)
+          </a>
+          <a
+            href="https://t.me/+HWRd8CbPTjU0YTU0"
+            target="_blank"
+            rel="noreferrer"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-extrabold text-[10px] uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all text-center"
+          >
+            💬 Community Telegram Group
+          </a>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
       
       {/* Left Column: Ticket Inbox List */}
       <div className="bg-white border border-gray-300 rounded-sm p-4 shadow-xs flex flex-col gap-3 md:col-span-1">
@@ -234,5 +264,6 @@ export default function TicketsView({
         )}
       </div>
     </div>
+  </div>
   );
 }

@@ -53,15 +53,23 @@ export default function CartOrdersView({
       while (ccNum.length < 16) {
         ccNum += Math.floor(Math.random() * 10).toString();
       }
-      const formattedNum = ccNum.replace(/(\d{4})/g, '$1 ').trim();
-      const cvv = Math.floor(Math.random() * 900) + 100;
+      const formattedNum = item.cardNumber || ccNum.replace(/(\d{4})/g, '$1 ').trim();
+      const cvv = item.cvv || (Math.floor(Math.random() * 900) + 100).toString();
       const names = ['John Miller', 'Sarah Connor', 'Michael Scott', 'Patrick Kamande', 'Emily Davis', 'Robert Vance'];
       const addresses = ['742 Evergreen Terrace', '1725 Slough Avenue', '10455 Magnolia Ave', '221B Baker St', '1600 Amphitheatre Pkwy'];
       
-      const selectName = names[Math.floor(Math.random() * names.length)];
+      const selectName = item.fullName || names[Math.floor(Math.random() * names.length)];
       const selectAddr = addresses[Math.floor(Math.random() * addresses.length)];
       const cities: Record<string, string> = { CA: 'Los Angeles', NY: 'New York', TX: 'Houston', FL: 'Miami', ON: 'Toronto', LND: 'London' };
       const selectCity = cities[item.state] || 'Springfield';
+      const addressString = item.fullAddressStr || `${selectAddr}, ${selectCity}, ${item.state}, ${item.zip}, ${item.country}`;
+      const phoneString = item.fullPhone || `+1 ${Math.floor(Math.random() * 900) + 100}-555-0199`;
+
+      const genSsn = item.fullSsn || (item.ssn ? `${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 90) + 10}-${Math.floor(Math.random() * 9000) + 1000}` : null);
+      const genDob = item.fullDob || (item.dob ? `${Math.floor(Math.random() * 12) + 1}/${Math.floor(Math.random() * 28) + 1}/${Math.floor(Math.random() * 30) + 1975}` : null);
+
+      const t1 = item.track1 || `B${formattedNum.replace(/\s+/g, '')}^${selectName.toUpperCase().replace(/\s+/g, '/')}^${item.expDate.replace('/', '')}10100000`;
+      const t2 = item.track2 || `${formattedNum.replace(/\s+/g, '')}=${item.expDate.replace('/', '')}10100000`;
 
       return {
         ...item,
@@ -70,12 +78,14 @@ export default function CartOrdersView({
         revealed: false,
         tested: 'untested', // 'untested' | 'valid' | 'dead'
         fullCc: formattedNum,
-        fullCvv: cvv.toString(),
+        fullCvv: cvv,
         fullName: selectName,
-        fullAddressStr: `${selectAddr}, ${selectCity}, ${item.state}, ${item.zip}, ${item.country}`,
-        fullPhone: `+1 ${Math.floor(Math.random() * 900) + 100}-555-0199`,
-        fullSsn: item.ssn ? `${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 90) + 10}-${Math.floor(Math.random() * 9000) + 1000}` : null,
-        fullDob: item.dob ? `${Math.floor(Math.random() * 12) + 1}/${Math.floor(Math.random() * 28) + 1}/${Math.floor(Math.random() * 30) + 1975}` : null,
+        fullAddressStr: addressString,
+        fullPhone: phoneString,
+        fullSsn: genSsn,
+        fullDob: genDob,
+        track1: t1,
+        track2: t2,
       };
     });
 
@@ -142,7 +152,9 @@ export default function CartOrdersView({
   };
 
   const handleDownloadTxt = (order: any) => {
-    const dump = `${order.fullCc.replace(/\s+/g, '')}|${order.expDate.replace('/', '|')}|${order.fullCvv}|${order.fullName}|${order.fullAddressStr}|${order.fullPhone}`;
+    const dump = order.withoutCvv2
+      ? `TRACK1: ${order.track1 || ''}\r\nTRACK2: ${order.track2 || ''}\r\nEXP: ${order.expDate || ''}`
+      : `${order.fullCc.replace(/\s+/g, '')}|${order.expDate.replace('/', '|')}|${order.fullCvv}|${order.fullName}|${order.fullAddressStr}|${order.fullPhone}`;
     const element = document.createElement('a');
     const file = new Blob([dump], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
@@ -306,9 +318,19 @@ export default function CartOrdersView({
                     <p className="font-bold text-gray-400 uppercase text-[9px] mb-1">Secure CC details</p>
                     {order.revealed && !isDead ? (
                       <div className="flex flex-col gap-1 select-all font-mono">
-                        <p><span className="text-gray-400">Card:</span> <span className="font-bold text-gray-900">{order.fullCc}</span></p>
-                        <p><span className="text-gray-400">Exp:</span> <span className="font-bold text-gray-900">{order.expDate}</span></p>
-                        <p><span className="text-gray-400">CVV:</span> <span className="font-bold text-gray-900">{order.fullCvv}</span></p>
+                        {order.withoutCvv2 ? (
+                          <>
+                            <p className="truncate" title={order.track1}><span className="text-gray-400 text-[10px]">Track1:</span> <span className="font-bold text-gray-900 text-[10px]">{order.track1}</span></p>
+                            <p className="truncate" title={order.track2}><span className="text-gray-400 text-[10px]">Track2:</span> <span className="font-bold text-gray-900 text-[10px]">{order.track2}</span></p>
+                            <p><span className="text-gray-400 text-[10px]">Exp:</span> <span className="font-bold text-gray-900 text-[10px]">{order.expDate}</span></p>
+                          </>
+                        ) : (
+                          <>
+                            <p><span className="text-gray-400">Card:</span> <span className="font-bold text-gray-900">{order.fullCc}</span></p>
+                            <p><span className="text-gray-400">Exp:</span> <span className="font-bold text-gray-900">{order.expDate}</span></p>
+                            <p><span className="text-gray-400">CVV:</span> <span className="font-bold text-gray-900">{order.fullCvv}</span></p>
+                          </>
+                        )}
                       </div>
                     ) : (
                       <p className="italic text-gray-400">Details are hidden. Click "Reveal" below to decode.</p>
@@ -364,9 +386,11 @@ export default function CartOrdersView({
                         </button>
                         <button
                           onClick={() => {
-                            const dump = `${order.fullCc.replace(/\s+/g, '')}|${order.expDate.replace('/', '|')}|${order.fullCvv}|${order.fullName}|${order.fullAddressStr}`;
+                            const dump = order.withoutCvv2
+                              ? `${order.track1 || ''}|${order.track2 || ''}`
+                              : `${order.fullCc.replace(/\s+/g, '')}|${order.expDate.replace('/', '|')}|${order.fullCvv}|${order.fullName}|${order.fullAddressStr}`;
                             navigator.clipboard.writeText(dump);
-                            onAddToast('Copied standard carding format to clipboard!', 'success');
+                            onAddToast(order.withoutCvv2 ? 'Copied Tracks to clipboard!' : 'Copied standard carding format to clipboard!', 'success');
                           }}
                           className="bg-gray-100 hover:bg-gray-200 text-gray-800 border rounded px-3 py-1.5 cursor-pointer flex items-center gap-1.5 text-[10px] font-bold"
                         >

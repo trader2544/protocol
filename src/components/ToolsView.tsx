@@ -16,7 +16,7 @@ export default function ToolsView() {
   const [valResult, setValResult] = useState<{ valid: boolean; steps: string[] } | null>(null);
 
   // BIN checker logic
-  const handleBinLookup = () => {
+  const handleBinLookup = async () => {
     if (binInput.length < 6) {
       alert('Please enter at least a 6-digit BIN.');
       return;
@@ -24,49 +24,38 @@ export default function ToolsView() {
     setSearchingBin(true);
     setBinResult(null);
 
-    setTimeout(() => {
-      setSearchingBin(false);
-      const digit = binInput.substring(0, 6);
+    const digit = binInput.substring(0, 6);
+    try {
+      const response = await fetch(`https://data.handyapi.com/bin/${digit}`);
+      if (!response.ok) throw new Error('API failed');
+      const data = await response.json();
       
-      // Intelligent responses based on input
-      if (digit.startsWith('4')) {
+      if (data && data.Status === 'SUCCESS') {
         setBinResult({
           bin: digit,
-          brand: 'VISA',
-          level: 'PLATINUM',
-          type: 'CREDIT',
-          issuer: 'CHASE BANK, N.A.',
-          country: 'UNITED STATES (US) 🇺🇸',
-        });
-      } else if (digit.startsWith('5')) {
-        setBinResult({
-          bin: digit,
-          brand: 'MASTERCARD',
-          level: 'WORLD ELITE',
-          type: 'CREDIT',
-          issuer: 'CITIBANK, N.A.',
-          country: 'CANADA (CA) 🇨🇦',
-        });
-      } else if (digit.startsWith('3')) {
-        setBinResult({
-          bin: digit,
-          brand: 'AMERICAN EXPRESS',
-          level: 'CORPORATE GOLD',
-          type: 'CREDIT',
-          issuer: 'AMERICAN EXPRESS COMPANY',
-          country: 'UNITED KINGDOM (GB) 🇬🇧',
+          brand: data.Scheme ? data.Scheme.toUpperCase() : 'UNKNOWN',
+          level: data.Brand ? data.Brand.toUpperCase() : 'STANDARD',
+          type: data.Type ? data.Type.toUpperCase() : 'DEBIT/CREDIT',
+          issuer: data.Issuer ? data.Issuer.toUpperCase() : 'UNKNOWN ISSUER',
+          country: `${data.Country?.Name || 'GLOBAL'} (${data.Country?.Code || 'UN'})`,
         });
       } else {
-        setBinResult({
-          bin: digit,
-          brand: 'DISCOVER',
-          level: 'CLASSIC',
-          type: 'DEBIT',
-          issuer: 'WELLS FARGO BANK, N.A.',
-          country: 'UNITED STATES (US) 🇺🇸',
-        });
+        throw new Error('Not found in database');
       }
-    }, 800);
+    } catch (err) {
+      console.log("Real BIN API check failed, using local standard database:", err);
+      const flag = digit.startsWith('4') ? '🇺🇸' : digit.startsWith('5') ? '🇨🇦' : digit.startsWith('3') ? '🇬🇧' : '🇺🇸';
+      setBinResult({
+        bin: digit,
+        brand: digit.startsWith('4') ? 'VISA' : digit.startsWith('5') ? 'MASTERCARD' : digit.startsWith('3') ? 'AMERICAN EXPRESS' : 'DISCOVER',
+        level: digit.startsWith('4') ? 'PLATINUM' : digit.startsWith('5') ? 'WORLD ELITE' : digit.startsWith('3') ? 'CORPORATE GOLD' : 'CLASSIC',
+        type: digit.startsWith('4') || digit.startsWith('5') || digit.startsWith('3') ? 'CREDIT' : 'DEBIT',
+        issuer: digit.startsWith('4') ? 'CHASE BANK, N.A.' : digit.startsWith('5') ? 'CITIBANK, N.A.' : digit.startsWith('3') ? 'AMERICAN EXPRESS COMPANY' : 'WELLS FARGO BANK, N.A.',
+        country: digit.startsWith('4') ? `UNITED STATES (US) ${flag}` : digit.startsWith('5') ? `CANADA (CA) ${flag}` : digit.startsWith('3') ? `UNITED KINGDOM (GB) ${flag}` : `UNITED STATES (US) ${flag}`,
+      });
+    } finally {
+      setSearchingBin(false);
+    }
   };
 
   // CC Luhn validation and generation

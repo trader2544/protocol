@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Mail, Lock, User, Eye, EyeOff, Loader2, KeyRound, CheckCircle2, AlertCircle } from 'lucide-react';
-import { getUserProfile, registerUserProfile } from '../utils/dbService';
+import { getUserProfile, registerUserProfile, isSupabaseConfigured } from '../utils/dbService';
+import { supabase } from '../supabase';
 import { UserProfile } from '../types';
 
 interface AuthPageProps {
@@ -57,7 +58,17 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
     try {
       if (isLogin) {
-        // Retrieve profile from Firestore
+        if (isSupabaseConfigured()) {
+          const { error: authError } = await supabase.auth.signInWithPassword({
+            email: trimmedEmail,
+            password: password,
+          });
+          if (authError) {
+            throw new Error(authError.message);
+          }
+        }
+
+        // Retrieve profile from Database
         const profile = await getUserProfile(trimmedEmail);
         
         // If password already set in Firestore, check it
@@ -127,8 +138,9 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         <h2 className="text-center text-3xl font-extrabold text-gray-900 tracking-tight">
           Protocol Database
         </h2>
-        <p className="mt-2 text-center text-xs text-gray-500 font-mono tracking-wider uppercase">
-          SECURE SANDBOX PORTAL
+        <p className="mt-2 text-center text-xs text-emerald-600 font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 font-bold">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          SECURE LIVE PORTAL
         </p>
       </div>
 
@@ -308,12 +320,10 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
             </div>
           </form>
 
-          {/* Access Note Helper */}
+          {/* Live system notice */}
           <div className="mt-6 border-t border-gray-100 pt-5 text-center">
             <p className="text-[11px] text-gray-400 font-sans leading-relaxed">
-              Any email address can be registered as a test customer profile.
-              <br />
-              Sign in with <span className="font-mono text-[#0c5460] font-semibold select-all">patrickkamande10455@gmail.com</span> to access the Database Administrator control panel.
+              Authorized personnel only. All access, modifications, and transactions are securely logged and audited.
             </p>
           </div>
 

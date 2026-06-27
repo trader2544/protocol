@@ -10,7 +10,11 @@ export type ActiveTab =
   | 'tools'
   | 'tickets'
   | 'help'
-  | 'admin';
+  | 'admin'
+  | 'banklogs'
+  | 'cashapp'
+  | 'paypal'
+  | 'rdp';
 
 export interface UserProfile {
   email: string;
@@ -55,6 +59,50 @@ export interface CardItem {
   emailPassword: boolean;
   withoutCvv2: boolean;
   base: string;
+  accountNumber?: boolean;
+  routingNumber?: boolean;
+  cardNumber?: string;
+  cvv?: string;
+  fullName?: string;
+  fullAddressStr?: string;
+  fullPhone?: string;
+  fullSsn?: string;
+  fullDob?: string;
+  track1?: string;
+  track2?: string;
+  fullMmn?: string;
+  fullAtmPin?: string;
+  fullDriverLicense?: string;
+  fullEmail?: string;
+  fullEmailPassword?: string;
+  fullAccountNumber?: string;
+  fullRoutingNumber?: string;
+  category?: 'dumps' | 'cvv2' | 'fullz' | 'banklogs' | 'cashapp' | 'paypal' | 'rdp';
+  loginUsername?: string;
+  loginPassword?: string;
+  bankBalance?: number;
+  bankAccountType?: string;
+  bankAccessType?: string;
+  cashappUsername?: string;
+  cashappEmail?: string;
+  cashappPhone?: string;
+  cashappPin?: string;
+  cashappHasFunds?: boolean;
+  cashappBalance?: number;
+  paypalEmail?: string;
+  paypalPassword?: string;
+  paypalCookies?: string;
+  paypalHasPaymentMethod?: boolean;
+  paypalBalance?: number;
+  rdpIp?: string;
+  rdpUsername?: string;
+  rdpPassword?: string;
+  rdpCountry?: string;
+  rdpState?: string;
+  rdpCity?: string;
+  rdpOs?: string;
+  rdpAccessType?: string;
+  rdpHospeed?: string;
 }
 
 export interface SupportTicket {

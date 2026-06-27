@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings, ShieldAlert, ArrowRight, User, AlertCircle, X, HelpCircle, ChevronDown, ShieldCheck } from 'lucide-react';
+import { Settings, ShieldAlert, ArrowRight, User, AlertCircle, X, HelpCircle, ChevronDown, ShieldCheck, Shield, Mail, Key, Calendar, DollarSign, Award, Activity, Lock, RefreshCw } from 'lucide-react';
 
 // Import our modular components
 import Header from './components/Header';
@@ -14,6 +14,7 @@ import HelpView from './components/HelpView';
 import CartOrdersView from './components/CartOrdersView';
 import Modals from './components/Modals';
 import AdminPanel from './components/AdminPanel';
+import LiveChatbox from './components/LiveChatbox';
 
 // Import models and types
 import { ActiveTab, UserProfile, CardItem, SupportTicket, AuctionItem, WholesalePack, NewsItem } from './types';
@@ -34,19 +35,19 @@ import {
   updateTicketMessages,
   getOrders,
   createOrder,
+  updateOrderTestStatus,
   getSystemSettings,
   updateSystemSettings,
   SystemSettings
 } from './utils/dbService';
 
-import { db } from './firebase';
 import AuthPage from './components/AuthPage';
 
-export default function App() {
-  // Authentication states
-  const [user, setUser] = useState<(UserProfile & { role: 'admin' | 'customer' }) | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
+export function MainDashboard({ user, setUser, onLogout }: { 
+  user: UserProfile & { role: 'admin' | 'customer' }; 
+  setUser: React.Dispatch<React.SetStateAction<(UserProfile & { role: 'admin' | 'customer' }) | null>>; 
+  onLogout: () => void; 
+}) {
   // Default active tab to CVV2 as shown in user's screenshot
   const [activeTab, setActiveTab] = useState<ActiveTab>('cvv2');
   
@@ -54,11 +55,49 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpDropdownOpen, setHelpDropdownOpen] = useState(false);
 
+  // User Profile Settings fields
+  const [usernameInput, setUsernameInput] = useState(user.username || '');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setUsernameInput(user.username || '');
+    }
+  }, [user?.username]);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!usernameInput.trim()) {
+      alert("Username cannot be empty.");
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      await updateUserProfile(user.email, {
+        username: usernameInput.trim(),
+        ...(passwordInput ? { password: passwordInput } : {})
+      });
+      setUser(prev => prev ? {
+        ...prev,
+        username: usernameInput.trim()
+      } : null);
+      setPasswordInput('');
+      addToast("Profile settings saved successfully!", "success");
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error saving settings: ${err.message || err}`);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   // Live system payment settings
   const [paymentAddresses, setPaymentAddresses] = useState<SystemSettings>({
     btcAddress: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
     ltcAddress: 'LQP92mxC9G9888AsXgH66688hS7sdfsF',
     ethAddress: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
+    usdtAddress: 'TR7NHqfe61L19L9fHX2989c56G7999jW53',
   });
 
   // Search Filter form states
@@ -90,6 +129,35 @@ export default function App() {
     email: false,
     emailPassword: false,
     withoutCvv2: false,
+    // Newly added filter keys for screenshot layouts
+    firstName: '',
+    lastName: '',
+    ownRent: '',
+    dlState: '',
+    accountNumber: false,
+    routingNumber: false,
+    bins8Digit: '',
+    bankCountry: '',
+    cardNumberLast4: '',
+    city: '',
+    code: '',
+    track1: false,
+    pin: false,
+    billingZip: false,
+    eddPin: false,
+    bankBalanceMin: 0,
+    bankAccountType: '',
+    bankAccessType: '',
+    cashappUsername: '',
+    cashappHasFunds: false,
+    cashappBalanceMin: 0,
+    paypalEmail: '',
+    paypalHasPaymentMethod: false,
+    paypalBalanceMin: 0,
+    rdpIp: '',
+    rdpCity: '',
+    rdpOs: '',
+    rdpAccessType: '',
   });
 
   // Data collections state from Firestore
@@ -139,24 +207,6 @@ export default function App() {
       }
     }
     initDbFetch();
-  }, []);
-
-  // Restore logged-in session on mount
-  useEffect(() => {
-    async function restoreSession() {
-      const storedEmail = localStorage.getItem('protocol_auth_email');
-      if (storedEmail) {
-        try {
-          const profile = await getUserProfile(storedEmail);
-          setUser(profile);
-        } catch (err) {
-          console.error("Failed to restore auth session:", err);
-          localStorage.removeItem('protocol_auth_email');
-        }
-      }
-      setAuthLoading(false);
-    }
-    restoreSession();
   }, []);
 
   // 2. Fetch user profile when email changes
@@ -347,15 +397,13 @@ export default function App() {
     }
   };
 
-  // Live test verification updates in Firestore
+  // Live test verification updates in Supabase
   const handleTestCardUpdate = async (purchaseId: string, isDead: boolean, refundAmount: number) => {
     try {
-      // Find order record in local state to retrieve Firestore ID
+      // Find order record in local state to retrieve database ID
       const orderMatch = orders.find(o => o.purchaseId === purchaseId);
       if (orderMatch && orderMatch.id) {
-        const { doc, updateDoc } = await import('firebase/firestore');
-        const docRef = doc(db, 'orders', orderMatch.id);
-        await updateDoc(docRef, { testStatus: isDead ? 'dead' : 'valid' });
+        await updateOrderTestStatus(orderMatch.id, isDead ? 'dead' : 'valid');
       }
 
       if (isDead && refundAmount > 0) {
@@ -503,29 +551,59 @@ export default function App() {
       email: false,
       emailPassword: false,
       withoutCvv2: false,
+      firstName: '',
+      lastName: '',
+      ownRent: '',
+      dlState: '',
+      accountNumber: false,
+      routingNumber: false,
+      bins8Digit: '',
+      bankCountry: '',
+      cardNumberLast4: '',
+      city: '',
+      code: '',
+      track1: false,
+      pin: false,
+      billingZip: false,
+      eddPin: false,
     });
     addToast('Filters reset successfully.', 'info');
-  };
-
-  // Simulated login swap
-  const handleLogout = () => {
-    localStorage.removeItem('protocol_auth_email');
-    setUser(null);
-    setCart([]);
-    setOrders([]);
-    addToast('Logged out successfully.', 'info');
   };
 
   // Filter logic
   const processedCards = useMemo(() => {
     return cardList.filter(card => {
       // Tab based filtering
-      if (activeTab === 'cvv2') {
-        if (card.withoutCvv2 || card.ssn || card.dob) return false;
-      } else if (activeTab === 'dumps') {
-        if (!card.withoutCvv2) return false;
-      } else if (activeTab === 'fullz') {
-        if (!card.ssn && !card.dob) return false;
+      const category = card.category || (card.withoutCvv2 ? 'dumps' : (card.ssn || card.dob ? 'fullz' : 'cvv2'));
+      if (activeTab !== category) return false;
+
+      // Banklogs filters
+      if (activeTab === 'banklogs') {
+        if (searchFilters.bankBalanceMin > 0 && (card.bankBalance === undefined || card.bankBalance < searchFilters.bankBalanceMin)) return false;
+        if (searchFilters.bankAccountType && card.bankAccountType !== searchFilters.bankAccountType) return false;
+        if (searchFilters.bankAccessType && card.bankAccessType !== searchFilters.bankAccessType) return false;
+      }
+
+      // Cashapp filters
+      if (activeTab === 'cashapp') {
+        if (searchFilters.cashappUsername.trim() && (!card.cashappUsername || !card.cashappUsername.toLowerCase().includes(searchFilters.cashappUsername.toLowerCase()))) return false;
+        if (searchFilters.cashappHasFunds && !card.cashappHasFunds) return false;
+        if (searchFilters.cashappBalanceMin > 0 && (card.cashappBalance === undefined || card.cashappBalance < searchFilters.cashappBalanceMin)) return false;
+      }
+
+      // Paypal filters
+      if (activeTab === 'paypal') {
+        if (searchFilters.paypalEmail.trim() && (!card.paypalEmail || !card.paypalEmail.toLowerCase().includes(searchFilters.paypalEmail.toLowerCase()))) return false;
+        if (searchFilters.paypalHasPaymentMethod && !card.paypalHasPaymentMethod) return false;
+        if (searchFilters.paypalBalanceMin > 0 && (card.paypalBalance === undefined || card.paypalBalance < searchFilters.paypalBalanceMin)) return false;
+      }
+
+      // RDP filters
+      if (activeTab === 'rdp') {
+        if (searchFilters.rdpIp.trim() && (!card.rdpIp || !card.rdpIp.toLowerCase().includes(searchFilters.rdpIp.toLowerCase()))) return false;
+        if (searchFilters.rdpCity.trim() && (!card.rdpCity || !card.rdpCity.toLowerCase().includes(searchFilters.rdpCity.toLowerCase()))) return false;
+        if (searchFilters.rdpOs && card.rdpOs !== searchFilters.rdpOs) return false;
+        if (searchFilters.rdpAccessType && card.rdpAccessType !== searchFilters.rdpAccessType) return false;
       }
 
       if (searchFilters.bins.trim()) {
@@ -567,23 +645,28 @@ export default function App() {
       if (searchFilters.email && !card.email) return false;
       if (searchFilters.emailPassword && !card.emailPassword) return false;
       if (searchFilters.withoutCvv2 && !card.withoutCvv2) return false;
+      if (searchFilters.accountNumber && !card.accountNumber) return false;
+      if (searchFilters.routingNumber && !card.routingNumber) return false;
+
+      // Fullz specific matches
+      if (searchFilters.firstName.trim() && (!card.fullName || !card.fullName.toLowerCase().includes(searchFilters.firstName.toLowerCase()))) return false;
+      if (searchFilters.lastName.trim() && (!card.fullName || !card.fullName.toLowerCase().includes(searchFilters.lastName.toLowerCase()))) return false;
+      if (searchFilters.dlState && card.state !== searchFilters.dlState) return false;
+
+      // Dumps specific matches
+      if (searchFilters.bins8Digit.trim()) {
+        const queryBins8 = searchFilters.bins8Digit.toLowerCase().replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+        const matchBin8 = queryBins8.some(qb => card.bin.startsWith(qb));
+        if (!matchBin8) return false;
+      }
+      if (searchFilters.bankCountry && card.country !== searchFilters.bankCountry) return false;
+      if (searchFilters.cardNumberLast4.trim() && (!card.cardNumber || !card.cardNumber.endsWith(searchFilters.cardNumberLast4.trim()))) return false;
+      if (searchFilters.city.trim() && (!card.fullAddressStr || !card.fullAddressStr.toLowerCase().includes(searchFilters.city.toLowerCase()))) return false;
+      if (searchFilters.track1 && !card.track1) return false;
 
       return true;
     });
   }, [cardList, searchFilters, activeTab]);
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0c5460]" />
-        <p className="mt-4 text-xs font-mono text-gray-500 uppercase tracking-wider">Loading Session...</p>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthPage onAuthSuccess={(profile) => setUser(profile)} />;
-  }
 
   return (
     <div className="min-h-screen bg-[#f5f6f8] text-gray-800 font-sans p-3 md:p-6 pb-20 select-none">
@@ -595,7 +678,7 @@ export default function App() {
         <Header
           user={user}
           setUser={setUser}
-          onLogout={handleLogout}
+          onLogout={onLogout}
           cartCount={cart.length}
         />
 
@@ -670,6 +753,54 @@ export default function App() {
             }`}
           >
             Fullz
+          </button>
+
+          {/* Bank Logs Tab */}
+          <button
+            onClick={() => setActiveTab('banklogs')}
+            className={`px-4 py-3.5 text-xs font-black transition-all border-r border-gray-300 cursor-pointer ${
+              activeTab === 'banklogs'
+                ? 'bg-[#ffebbc] text-amber-950 font-black shadow-inner border-b-2 border-b-[#ffebbc]'
+                : 'bg-[#ffebbc]/30 hover:bg-[#ffebbc]/50 text-amber-900 font-bold'
+            }`}
+          >
+            Bank Logs
+          </button>
+
+          {/* CashApp Tab */}
+          <button
+            onClick={() => setActiveTab('cashapp')}
+            className={`px-4 py-3.5 text-xs font-black transition-all border-r border-gray-300 cursor-pointer ${
+              activeTab === 'cashapp'
+                ? 'bg-[#d1fbc6] text-[#1b5e20] font-black shadow-inner border-b-2 border-b-[#d1fbc6]'
+                : 'bg-[#d1fbc6]/30 hover:bg-[#d1fbc6]/50 text-[#1b5e20] font-bold'
+            }`}
+          >
+            CashApp
+          </button>
+
+          {/* PayPal Tab */}
+          <button
+            onClick={() => setActiveTab('paypal')}
+            className={`px-4 py-3.5 text-xs font-black transition-all border-r border-gray-300 cursor-pointer ${
+              activeTab === 'paypal'
+                ? 'bg-[#cce3fc] text-[#0d47a1] font-black shadow-inner border-b-2 border-b-[#cce3fc]'
+                : 'bg-[#cce3fc]/30 hover:bg-[#cce3fc]/50 text-[#0d47a1] font-bold'
+            }`}
+          >
+            PayPal
+          </button>
+
+          {/* RDP/VPS Tab */}
+          <button
+            onClick={() => setActiveTab('rdp')}
+            className={`px-4 py-3.5 text-xs font-black transition-all border-r border-gray-300 cursor-pointer ${
+              activeTab === 'rdp'
+                ? 'bg-[#f0c6fc] text-purple-950 font-black shadow-inner border-b-2 border-b-[#f0c6fc]'
+                : 'bg-[#f0c6fc]/30 hover:bg-[#f0c6fc]/50 text-purple-900 font-bold'
+            }`}
+          >
+            RDP/VPS
           </button>
 
           {/* Wholesale Tab */}
@@ -826,9 +957,10 @@ export default function App() {
         {/* Dynamic Inner Tab View Contents */}
         <main className="flex-grow select-none">
           {/* 1. Main Search Tabs (CVV2, Dumps, Fullz are structured using the Filter Form & Table Layout!) */}
-          {(activeTab === 'cvv2' || activeTab === 'dumps' || activeTab === 'fullz') && (
+          {(activeTab === 'cvv2' || activeTab === 'dumps' || activeTab === 'fullz' || activeTab === 'banklogs' || activeTab === 'cashapp' || activeTab === 'paypal' || activeTab === 'rdp') && (
             <div className="flex flex-col gap-4">
               <FilterForm
+                activeTab={activeTab}
                 searchFilters={searchFilters}
                 setSearchFilters={setSearchFilters}
                 onSearch={() => addToast('Search filters updated.', 'success')}
@@ -919,6 +1051,9 @@ export default function App() {
               systemSettings={paymentAddresses}
               onUpdateSettings={handleUpdateSettings}
               onAddToast={addToast}
+              setNewsList={setNewsList}
+              setWholesaleList={setWholesaleList}
+              setAuctions={setAuctions}
             />
           )}
         </main>
@@ -927,60 +1062,110 @@ export default function App() {
 
       {/* Settings Side Drawer Panel */}
       {settingsOpen && (
-        <div className="fixed inset-y-0 right-0 w-80 bg-white border-l border-gray-200 shadow-2xl p-5 z-40 select-text flex flex-col gap-4 text-xs text-gray-700">
-          <div className="flex justify-between items-center border-b pb-2 mb-2">
+        <div className="fixed inset-y-0 right-0 w-85 bg-white border-l border-gray-200 shadow-2xl p-5 z-40 select-text flex flex-col gap-5 text-xs text-gray-700 overflow-y-auto">
+          <div className="flex justify-between items-center border-b pb-2.5">
             <h3 className="font-extrabold text-[#0c5460] text-sm uppercase flex items-center gap-1.5">
-              <Settings className="w-4 h-4 animate-spin-slow" /> Profile Variables
+              <Settings className="w-4 h-4 animate-spin-slow" /> Account Settings
             </h3>
             <button onClick={() => setSettingsOpen(false)} className="text-gray-400 hover:text-black cursor-pointer">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div>
-            <label className="block font-bold text-gray-800 mb-1">Testing Email:</label>
-            <input
-              type="email"
-              value={user.email}
-              onChange={e => setUser(prev => ({ 
-                ...prev, 
-                email: e.target.value,
-                role: e.target.value.toLowerCase() === 'patrickkamande10455@gmail.com' ? 'admin' : 'customer'
-              }))}
-              className="w-full border border-gray-300 rounded p-1.5 focus:outline-none focus:border-blue-400 font-semibold text-gray-800"
-            />
+          {/* Read-Only Account Profile stats */}
+          <div className="bg-gray-50 border border-gray-100 p-3.5 rounded-lg flex flex-col gap-3">
+            <h4 className="font-extrabold uppercase text-[10px] tracking-wider text-gray-500 border-b pb-1">
+              Account Metadata
+            </h4>
+            
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-start gap-2">
+                <Shield className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">Privilege Level</span>
+                  <span className="font-extrabold text-[#0c5460] flex items-center gap-1">
+                    {user.role === 'admin' ? '🔥 Administrator (Root)' : '👤 Customer'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <DollarSign className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">Account Balance</span>
+                  <span className="font-extrabold text-emerald-800 font-mono text-[13px]">${user.balance.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <Award className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">Crab Rating Score</span>
+                  <span className="font-bold text-amber-700 font-mono">{user.crabRating} crabs</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">Registration Date</span>
+                  <span className="font-semibold text-gray-700 font-mono">
+                    {user.creationDate ? new Date(user.creationDate).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'N/A'}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block font-bold text-gray-800 mb-1">Active Balance ($):</label>
-            <input
-              type="number"
-              value={user.balance}
-              onChange={e => {
-                const b = parseFloat(e.target.value) || 0;
-                setUser(prev => ({ ...prev, balance: b, accountStatus: b > 0 ? 'active' : 'inactive' }));
-              }}
-              className="w-full border border-gray-300 rounded p-1.5 focus:outline-none focus:border-blue-400 font-bold font-mono text-emerald-800"
-            />
-          </div>
+          {/* Editable Settings form */}
+          <form onSubmit={handleSaveSettings} className="flex flex-col gap-4">
+            <h4 className="font-extrabold uppercase text-[10px] tracking-wider text-gray-500 border-b pb-1">
+              Customize Profile
+            </h4>
 
-          <div>
-            <label className="block font-bold text-gray-800 mb-1">Account Activation:</label>
-            <select
-              value={user.accountStatus}
-              onChange={e => setUser(prev => ({ ...prev, accountStatus: e.target.value as any }))}
-              className="w-full border border-gray-300 rounded p-1.5 bg-white font-bold text-gray-700"
+            <div className="flex flex-col gap-1.5">
+              <label className="font-bold text-gray-700 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-gray-400" /> Username / Display Name:
+              </label>
+              <input
+                type="text"
+                value={usernameInput}
+                onChange={e => setUsernameInput(e.target.value)}
+                placeholder="Enter display name"
+                className="w-full border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-400 font-semibold text-gray-800 bg-white text-xs"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="font-bold text-gray-700 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-gray-400" /> New Password (leave blank to keep current):
+              </label>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={e => setPasswordInput(e.target.value)}
+                placeholder="••••••••"
+                className="w-full border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-400 font-mono text-xs"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={savingSettings}
+              className="w-full bg-[#0c5460] hover:bg-[#083a43] text-white font-extrabold py-2.5 px-4 rounded border border-[#0c5460] transition-colors cursor-pointer text-xs uppercase shadow-xs flex items-center justify-center gap-1.5 mt-2"
             >
-              <option value="inactive">Inactive (Show Warning Alert)</option>
-              <option value="active">Active (Remove Alert Banner)</option>
-            </select>
-          </div>
-
-          <div className="bg-gray-50 border border-gray-200 rounded p-3 text-[10px] text-gray-500 leading-relaxed font-semibold mt-auto">
-            <p className="font-extrabold text-gray-700 uppercase mb-1">Live Database Status</p>
-            <p>Database Node: Firestore Sync active</p>
-            <p>Active Connection: Normal</p>
-          </div>
+              {savingSettings ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving Changes...
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" /> Save Profile Settings
+                </>
+              )}
+            </button>
+          </form>
         </div>
       )}
 
@@ -992,6 +1177,9 @@ export default function App() {
         onAddToast={addToast}
         paymentAddresses={paymentAddresses}
       />
+
+      {/* Floating Live Trading Chatbox / Shoutbox */}
+      {user && <LiveChatbox user={user} />}
 
       {/* Custom Floating Stack Toast Notifications */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none select-none max-w-sm">
@@ -1016,5 +1204,55 @@ export default function App() {
       </div>
 
     </div>
+  );
+}
+
+// ---------------- Clerk SSO & Custom Fallback Wrappers ----------------
+
+export default function App() {
+  const [user, setUser] = useState<(UserProfile & { role: 'admin' | 'customer' }) | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    async function restoreSession() {
+      const storedEmail = localStorage.getItem('protocol_auth_email');
+      if (storedEmail) {
+        try {
+          const profile = await getUserProfile(storedEmail);
+          setUser(profile);
+        } catch (err) {
+          console.error("Failed to restore auth session:", err);
+          localStorage.removeItem('protocol_auth_email');
+        }
+      }
+      setAuthLoading(false);
+    }
+    restoreSession();
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('protocol_auth_email');
+    setUser(null);
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#f5f6f8] flex flex-col justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0c5460]" />
+        <p className="mt-4 text-xs font-mono text-gray-500 uppercase tracking-wider">Loading Session...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage onAuthSuccess={(profile) => setUser(profile)} />;
+  }
+
+  return (
+    <MainDashboard
+      user={user}
+      setUser={setUser}
+      onLogout={handleLogout}
+    />
   );
 }
