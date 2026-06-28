@@ -151,7 +151,7 @@ export default function LiveChatbox({ user }: LiveChatboxProps) {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="bg-[#0c5460] hover:bg-[#073a43] text-white p-3.5 rounded-full shadow-2xl flex items-center gap-2 cursor-pointer transition-all duration-300 transform hover:scale-105 border-2 border-white relative"
+          className="bg-[#0c5460] hover:bg-[#073a43] text-white p-2.5 rounded-full shadow-2xl flex items-center gap-2 cursor-pointer transition-all duration-300 transform hover:scale-102 border-2 border-white relative opacity-90 hover:opacity-100"
           id="chatbox_toggle_btn"
         >
           <MessageSquare className="w-5 h-5" />

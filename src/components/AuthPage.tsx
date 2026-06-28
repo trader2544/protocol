@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Mail, Lock, User, Eye, EyeOff, Loader2, KeyRound, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Shield, Mail, Lock, User, Eye, EyeOff, Loader2, KeyRound, CheckCircle2, AlertCircle, Check } from 'lucide-react';
 import { getUserProfile, registerUserProfile, isSupabaseConfigured } from '../utils/dbService';
 import { supabase } from '../supabase';
 import { UserProfile } from '../types';
@@ -19,11 +19,33 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [captchaStatus, setCaptchaStatus] = useState<'idle' | 'verifying' | 'verified'>('idle');
+
+  const handleCaptchaClick = () => {
+    if (captchaStatus !== 'idle') return;
+    setCaptchaStatus('verifying');
+    setTimeout(() => {
+      setCaptchaStatus('verified');
+    }, 1200);
+  };
+
+  const toggleAuthMode = (login: boolean) => {
+    setIsLogin(login);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setCaptchaStatus('idle');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+
+    // Captcha Validation
+    if (captchaStatus !== 'verified') {
+      setErrorMsg("Please complete the security check: Verify you are human.");
+      return;
+    }
 
     // Validation
     const trimmedEmail = email.trim().toLowerCase();
@@ -150,11 +172,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
           {/* Tabs header */}
           <div className="flex border-b border-gray-200 mb-6">
             <button
-              onClick={() => {
-                setIsLogin(true);
-                setErrorMsg(null);
-                setSuccessMsg(null);
-              }}
+              onClick={() => toggleAuthMode(true)}
               className={`flex-1 pb-3 text-sm font-semibold text-center border-b-2 transition-all ${
                 isLogin
                   ? 'border-[#0c5460] text-[#0c5460]'
@@ -165,11 +183,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
               Sign In
             </button>
             <button
-              onClick={() => {
-                setIsLogin(false);
-                setErrorMsg(null);
-                setSuccessMsg(null);
-              }}
+              onClick={() => toggleAuthMode(false)}
               className={`flex-1 pb-3 text-sm font-semibold text-center border-b-2 transition-all ${
                 !isLogin
                   ? 'border-[#0c5460] text-[#0c5460]'
@@ -296,6 +310,43 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 </div>
               </div>
             )}
+
+            {/* CAPTCHA CHALLENGE */}
+            <div className="bg-gray-50 border border-gray-200 rounded p-3 flex items-center justify-between select-none text-[11px] mb-2">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleCaptchaClick}
+                  disabled={captchaStatus !== 'idle' || loading}
+                  className={`w-6 h-6 border-2 rounded transition-all flex items-center justify-center ${
+                    captchaStatus === 'idle'
+                      ? 'border-gray-300 hover:border-[#0c5460] bg-white cursor-pointer'
+                      : captchaStatus === 'verifying'
+                      ? 'border-[#0c5460] bg-[#e6f2f5]'
+                      : 'border-emerald-500 bg-emerald-50 text-white'
+                  }`}
+                  id="auth-captcha-checkbox"
+                >
+                  {captchaStatus === 'verifying' && (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0c5460]" />
+                  )}
+                  {captchaStatus === 'verified' && (
+                    <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white animate-scale-up">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    </div>
+                  )}
+                </button>
+                <span className="font-semibold text-gray-700">
+                  {captchaStatus === 'idle' && "Verify you are human"}
+                  {captchaStatus === 'verifying' && "Checking secure connection..."}
+                  {captchaStatus === 'verified' && "Verification successful"}
+                </span>
+              </div>
+              <div className="flex flex-col items-end opacity-60">
+                <Shield className="w-4 h-4 text-[#0c5460]" />
+                <span className="text-[7px] font-black text-[#0c5460] uppercase mt-0.5 tracking-widest">PROT-SHIELD</span>
+              </div>
+            </div>
 
             {/* BUTTON */}
             <div>
