@@ -1024,6 +1024,7 @@ export default function AdminPanel({
           emailPassword: false,
           withoutCvv2: bulkCategory === 'dumps',
           base: bulkBase,
+          category: bulkCategory,
         });
       }
 
