@@ -184,7 +184,7 @@ export function MainDashboard({ user, setUser, onLogout }: {
     }, 4000);
   };
 
-  // 1. Initial mounting fetch
+  // 1. Initial mounting fetch and refresh when login changes
   useEffect(() => {
     async function initDbFetch() {
       try {
@@ -207,7 +207,7 @@ export function MainDashboard({ user, setUser, onLogout }: {
       }
     }
     initDbFetch();
-  }, []);
+  }, [user?.email]);
 
   // 2. Fetch user profile when email changes
   useEffect(() => {

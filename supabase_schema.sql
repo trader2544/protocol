@@ -42,7 +42,7 @@ create policy "Users can update their own profile fields" on public.profiles
 
 drop policy if exists "Admin can insert profiles" on public.profiles;
 create policy "Admin can insert profiles" on public.profiles
-  for insert with check (public.is_admin());
+  for insert with check (auth.uid() = id or public.is_admin());
 
 
 -- 3. Create CVVs table (Separated table for CVV/CVV2 cards)

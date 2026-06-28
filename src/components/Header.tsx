@@ -33,7 +33,7 @@ export default function Header({ user, setUser, onLogout, cartCount }: HeaderPro
       {/* Left side details */}
       <div className="flex flex-col gap-1.5 select-text">
         <h1 className="text-xl font-normal text-gray-800 tracking-tight">
-          Welcome, <span className="text-[#0c5460] font-semibold italic">anonymous.</span>
+          Welcome, <span className="text-[#0c5460] font-semibold italic">{user.username || 'anonymous'}.</span>
         </h1>
         
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-gray-600">
