@@ -146,7 +146,7 @@ export default function LiveChatbox({ user }: LiveChatboxProps) {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 font-sans select-text text-xs">
+    <div className="fixed bottom-5 left-5 z-50 font-sans select-text text-xs">
       {/* Floating Toggle Button */}
       {!isOpen && (
         <button

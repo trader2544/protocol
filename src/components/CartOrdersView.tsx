@@ -194,9 +194,42 @@ export default function CartOrdersView({
     } else if (order.category === 'rdp') {
       dump = `=== RDP PURCHASE ===\r\nHost IP: ${order.rdpIp || ''}\r\nUsername: ${order.rdpUsername || ''}\r\nPassword: ${order.rdpPassword || ''}\r\nLocation: ${order.rdpCity || ''}, ${order.rdpState || ''}, ${order.rdpCountry || ''}\r\nOS: ${order.rdpOs || ''}\r\nAccess Type: ${order.rdpAccessType || ''}\r\nSpeed: ${order.rdpHospeed || ''}\r\nBase: ${order.base || ''}`;
     } else {
-      dump = order.withoutCvv2
-        ? `TRACK1: ${order.track1 || ''}\r\nTRACK2: ${order.track2 || ''}\r\nEXP: ${order.expDate || ''}`
-        : `${order.fullCc ? order.fullCc.replace(/\s+/g, '') : ''}|${order.expDate ? order.expDate.replace('/', '|') : ''}|${order.fullCvv || ''}|${order.fullName || ''}|${order.fullAddressStr || ''}|${order.fullPhone || ''}`;
+      let cardLines = [];
+      cardLines.push(`=== SECURE CARD/PRODUCT DETAILS ===`);
+      if (order.category) cardLines.push(`Category: ${order.category.toUpperCase()}`);
+      if (order.bin) cardLines.push(`BIN: ${order.bin}`);
+      if (order.fullCc || order.cardNumber) cardLines.push(`Card Number: ${order.fullCc || order.cardNumber}`);
+      if (order.expDate) cardLines.push(`Exp Date: ${order.expDate}`);
+      if (order.fullCvv || order.cvv) cardLines.push(`CVV: ${order.fullCvv || order.cvv}`);
+      if (order.fullName) cardLines.push(`Full Name: ${order.fullName}`);
+      if (order.fullAddressStr) cardLines.push(`Billing Address: ${order.fullAddressStr}`);
+      if (order.fullPhone) cardLines.push(`Phone Number: ${order.fullPhone}`);
+      if (order.fullSsn) {
+        cardLines.push(`SSN: ${order.fullSsn}`);
+      } else if (order.ssn) {
+        cardLines.push(`SSN Info: Included`);
+      }
+      if (order.fullDob) {
+        cardLines.push(`DOB: ${order.fullDob}`);
+      } else if (order.dob) {
+        cardLines.push(`DOB Info: Included`);
+      }
+      if (order.fullMmn) cardLines.push(`Mother's Maiden Name (MMN): ${order.fullMmn}`);
+      if (order.fullAtmPin) cardLines.push(`ATM PIN: ${order.fullAtmPin}`);
+      if (order.fullDriverLicense) cardLines.push(`Driver's License: ${order.fullDriverLicense}`);
+      if (order.fullEmail) cardLines.push(`Email: ${order.fullEmail}`);
+      if (order.fullEmailPassword) cardLines.push(`Email Password: ${order.fullEmailPassword}`);
+      if (order.fullAccountNumber) cardLines.push(`Bank Account Number: ${order.fullAccountNumber}`);
+      if (order.fullRoutingNumber) cardLines.push(`Bank Routing Number: ${order.fullRoutingNumber}`);
+      if (order.track1) cardLines.push(`Track 1: ${order.track1}`);
+      if (order.track2) cardLines.push(`Track 2: ${order.track2}`);
+      if (order.base) cardLines.push(`Base Group: ${order.base}`);
+      
+      if (order.fullCc) {
+        const rawPipe = `${(order.fullCc || '').replace(/\s+/g, '')}|${(order.expDate || '').replace('/', '|')}|${order.fullCvv || ''}|${order.fullName || ''}|${order.fullAddressStr || ''}|${order.fullPhone || ''}`;
+        cardLines.push(`\r\n=== RAW PIPE DUMP ===\r\n${rawPipe}`);
+      }
+      dump = cardLines.join('\r\n');
     }
 
     const element = document.createElement('a');
@@ -301,7 +334,7 @@ export default function CartOrdersView({
   return (
     <div className="bg-white border border-gray-300 rounded-sm p-4 shadow-xs text-xs flex flex-col gap-4">
       <h2 className="text-sm font-bold text-[#0c5460] uppercase border-b pb-2 flex items-center gap-2">
-        <ShieldCheck className="w-4 h-4 text-emerald-600" /> Purchased Sandbox Cards ({orders.length} inventory)
+        <ShieldCheck className="w-4 h-4 text-emerald-600" /> Purchased Cards ({orders.length} inventory)
       </h2>
 
       {orders.length === 0 ? (
@@ -742,6 +775,38 @@ export default function CartOrdersView({
                       <div className="bg-gray-50 p-3 rounded border flex flex-col gap-2 font-mono">
                         {selectedDetailsOrder.fullSsn && <p><span className="font-bold text-gray-400 uppercase text-[9px]">SSN:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullSsn}</span></p>}
                         {selectedDetailsOrder.fullDob && <p><span className="font-bold text-gray-400 uppercase text-[9px]">DOB:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullDob}</span></p>}
+                      </div>
+                    </>
+                  )}
+
+                  {(selectedDetailsOrder.fullMmn || 
+                    selectedDetailsOrder.fullAtmPin || 
+                    selectedDetailsOrder.fullDriverLicense || 
+                    selectedDetailsOrder.fullEmail || 
+                    selectedDetailsOrder.fullAccountNumber || 
+                    selectedDetailsOrder.fullRoutingNumber ||
+                    selectedDetailsOrder.track1 ||
+                    selectedDetailsOrder.track2 ||
+                    selectedDetailsOrder.base) && (
+                    <>
+                      <h4 className="font-bold border-b pb-1 text-gray-800 uppercase tracking-wide mt-2 font-sans">📋 Extra Credentials & Uploaded Inputs</h4>
+                      <div className="bg-gray-50 p-3 rounded border flex flex-col gap-2 font-mono text-[11px]">
+                        {selectedDetailsOrder.fullMmn && <p><span className="font-bold text-gray-400 uppercase text-[9px]">MMN:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullMmn}</span></p>}
+                        {selectedDetailsOrder.fullAtmPin && <p><span className="font-bold text-gray-400 uppercase text-[9px]">ATM PIN:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullAtmPin}</span></p>}
+                        {selectedDetailsOrder.fullDriverLicense && <p><span className="font-bold text-gray-400 uppercase text-[9px]">Driver License:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullDriverLicense}</span></p>}
+                        {selectedDetailsOrder.fullEmail && (
+                          <p>
+                            <span className="font-bold text-gray-400 uppercase text-[9px]">Email Info:</span>{' '}
+                            <span className="font-bold text-gray-950">
+                              {selectedDetailsOrder.fullEmail} {selectedDetailsOrder.fullEmailPassword ? ` | Password: ${selectedDetailsOrder.fullEmailPassword}` : ''}
+                            </span>
+                          </p>
+                        )}
+                        {selectedDetailsOrder.fullAccountNumber && <p><span className="font-bold text-gray-400 uppercase text-[9px]">Account No:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullAccountNumber}</span></p>}
+                        {selectedDetailsOrder.fullRoutingNumber && <p><span className="font-bold text-gray-400 uppercase text-[9px]">Routing No:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullRoutingNumber}</span></p>}
+                        {selectedDetailsOrder.base && <p><span className="font-bold text-gray-400 uppercase text-[9px]">Base Pack:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.base}</span></p>}
+                        {selectedDetailsOrder.track1 && <p className="truncate" title={selectedDetailsOrder.track1}><span className="font-bold text-gray-400 uppercase text-[9px]">Track 1:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.track1}</span></p>}
+                        {selectedDetailsOrder.track2 && <p className="truncate" title={selectedDetailsOrder.track2}><span className="font-bold text-gray-400 uppercase text-[9px]">Track 2:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.track2}</span></p>}
                       </div>
                     </>
                   )}

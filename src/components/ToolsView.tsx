@@ -132,7 +132,7 @@ export default function ToolsView() {
       <div className="bg-white border border-gray-300 rounded-sm p-4 shadow-xs flex flex-col gap-4">
         <div>
           <h3 className="font-extrabold text-sm text-[#0c5460] uppercase border-b pb-1.5 mb-2 flex items-center gap-2">
-            🔍 Sandbox BIN Checker
+            🔍 Live BIN Checker
           </h3>
           <p className="text-gray-500 mb-3 text-[11px]">
             Lookup the brand, card type, level tier, and country of origin for any 6-digit BIN.

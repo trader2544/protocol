@@ -1829,17 +1829,29 @@ export async function getOrders(email: string): Promise<any[]> {
     const { data, error } = await query;
     if (error) throw error;
 
-    return data.map(o => ({
-      id: o.id,
-      userEmail: o.user_email,
-      bin: o.bin,
-      bank: o.bank,
-      price: Number(o.price),
-      purchaseId: o.purchase_id,
-      testStatus: o.test_status,
-      details: o.details,
-      timestamp: o.created_at,
-    }));
+    return data.map(o => {
+      let extra = {};
+      if (o.details) {
+        try {
+          extra = typeof o.details === 'string' ? JSON.parse(o.details) : o.details;
+        } catch (e) {
+          console.error("Failed to parse order details:", e);
+        }
+      }
+      return {
+        id: o.id,
+        userEmail: o.user_email,
+        bin: o.bin,
+        bank: o.bank,
+        price: Number(o.price),
+        purchaseId: o.purchase_id,
+        testStatus: o.test_status || 'untested',
+        tested: o.test_status || 'untested',
+        details: o.details,
+        timestamp: o.created_at,
+        ...extra,
+      };
+    });
   } catch (err) {
     console.error("Supabase getOrders failed:", err);
     return [];
