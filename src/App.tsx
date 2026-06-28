@@ -582,6 +582,10 @@ export function MainDashboard({ user, setUser, onLogout }: {
         if (searchFilters.bankBalanceMin > 0 && (card.bankBalance === undefined || card.bankBalance < searchFilters.bankBalanceMin)) return false;
         if (searchFilters.bankAccountType && card.bankAccountType !== searchFilters.bankAccountType) return false;
         if (searchFilters.bankAccessType && card.bankAccessType !== searchFilters.bankAccessType) return false;
+        if (searchFilters.bank && card.bank !== searchFilters.bank) return false;
+        if (searchFilters.country && card.country !== searchFilters.country) return false;
+        if (searchFilters.state && card.state !== searchFilters.state) return false;
+        return true;
       }
 
       // Cashapp filters
@@ -589,6 +593,7 @@ export function MainDashboard({ user, setUser, onLogout }: {
         if (searchFilters.cashappUsername.trim() && (!card.cashappUsername || !card.cashappUsername.toLowerCase().includes(searchFilters.cashappUsername.toLowerCase()))) return false;
         if (searchFilters.cashappHasFunds && !card.cashappHasFunds) return false;
         if (searchFilters.cashappBalanceMin > 0 && (card.cashappBalance === undefined || card.cashappBalance < searchFilters.cashappBalanceMin)) return false;
+        return true;
       }
 
       // Paypal filters
@@ -596,6 +601,7 @@ export function MainDashboard({ user, setUser, onLogout }: {
         if (searchFilters.paypalEmail.trim() && (!card.paypalEmail || !card.paypalEmail.toLowerCase().includes(searchFilters.paypalEmail.toLowerCase()))) return false;
         if (searchFilters.paypalHasPaymentMethod && !card.paypalHasPaymentMethod) return false;
         if (searchFilters.paypalBalanceMin > 0 && (card.paypalBalance === undefined || card.paypalBalance < searchFilters.paypalBalanceMin)) return false;
+        return true;
       }
 
       // RDP filters
@@ -604,6 +610,7 @@ export function MainDashboard({ user, setUser, onLogout }: {
         if (searchFilters.rdpCity.trim() && (!card.rdpCity || !card.rdpCity.toLowerCase().includes(searchFilters.rdpCity.toLowerCase()))) return false;
         if (searchFilters.rdpOs && card.rdpOs !== searchFilters.rdpOs) return false;
         if (searchFilters.rdpAccessType && card.rdpAccessType !== searchFilters.rdpAccessType) return false;
+        return true;
       }
 
       if (searchFilters.bins.trim()) {
@@ -1051,8 +1058,13 @@ export function MainDashboard({ user, setUser, onLogout }: {
               systemSettings={paymentAddresses}
               onUpdateSettings={handleUpdateSettings}
               onAddToast={addToast}
+              cardList={cardList}
+              setCardList={setCardList}
+              newsList={newsList}
               setNewsList={setNewsList}
+              wholesaleList={wholesaleList}
               setWholesaleList={setWholesaleList}
+              auctions={auctions}
               setAuctions={setAuctions}
             />
           )}

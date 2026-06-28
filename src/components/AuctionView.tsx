@@ -125,7 +125,7 @@ export default function AuctionView({ auctions, setAuctions, user, setUser, onAd
         </h2>
         <p className="text-gray-500 mb-5 leading-relaxed">
           Auction items are exclusive, rare premium profiles containing valid data with high credit limits.
-          Bidding increases by minimum increments of $0.50. High bids lock funds from your sandbox wallet.
+          Bidding increases by minimum increments of $0.50. High bids lock funds from your wallet balance.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

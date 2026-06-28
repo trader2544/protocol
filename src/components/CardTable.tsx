@@ -78,7 +78,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
     return (
       <div className="bg-white border border-gray-300 rounded-sm p-8 text-center text-gray-500 shadow-2xs select-text">
         <ShieldAlert className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-        <span className="font-bold text-gray-700 text-sm block">No sandbox cards found matching filters.</span>
+        <span className="font-bold text-gray-700 text-sm block">No cards found matching filters.</span>
         <span className="text-xs">Adjust your search criteria above or reset filters to load items.</span>
       </div>
     );

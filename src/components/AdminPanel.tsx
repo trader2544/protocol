@@ -8,7 +8,9 @@ import { CardItem, SupportTicket, NewsItem, WholesalePack, AuctionItem } from '.
 import { 
   SystemSettings, getTickets, updateTicketMessages, getPayments, 
   updatePaymentStatus, getUserProfile, updateUserProfile,
-  addNewsItem, addWholesalePack, addAuctionItem 
+  addNewsItem, addWholesalePack, addAuctionItem,
+  deleteCard, updateCard, deleteNewsItem, updateNewsItem,
+  deleteWholesalePack, updateWholesalePack, deleteAuctionItem, updateAuctionItem
 } from '../utils/dbService';
 
 interface AdminPanelProps {
@@ -17,8 +19,13 @@ interface AdminPanelProps {
   systemSettings: SystemSettings;
   onUpdateSettings: (settings: SystemSettings) => Promise<any>;
   onAddToast: (msg: string, type: 'success' | 'info') => void;
+  cardList: CardItem[];
+  setCardList: React.Dispatch<React.SetStateAction<CardItem[]>>;
+  newsList: NewsItem[];
   setNewsList: React.Dispatch<React.SetStateAction<NewsItem[]>>;
+  wholesaleList: WholesalePack[];
   setWholesaleList: React.Dispatch<React.SetStateAction<WholesalePack[]>>;
+  auctions: AuctionItem[];
   setAuctions: React.Dispatch<React.SetStateAction<AuctionItem[]>>;
 }
 
@@ -28,10 +35,17 @@ export default function AdminPanel({
   systemSettings,
   onUpdateSettings,
   onAddToast,
+  cardList,
+  setCardList,
+  newsList,
   setNewsList,
+  wholesaleList,
   setWholesaleList,
+  auctions,
   setAuctions,
 }: AdminPanelProps) {
+  const safeNum = (val: any) => (val === undefined || val === null || isNaN(val) ? '' : val);
+
   // Tabs inside Admin Panel
   const [adminTab, setAdminTab] = useState<'dumps' | 'cvv2' | 'fullz' | 'banklogs' | 'cashapp' | 'paypal' | 'rdp' | 'bulk' | 'news' | 'wholesale' | 'auction' | 'tickets' | 'payments' | 'addresses'>('dumps');
 
@@ -147,6 +161,499 @@ export default function AdminPanel({
     }
     loadAdminData();
   }, [adminTab]);
+
+  const [editingItem, setEditingItem] = useState<{
+    type: 'card' | 'news' | 'wholesale' | 'auction';
+    item: any;
+  } | null>(null);
+
+  const handleDeleteItem = async (type: 'card' | 'news' | 'wholesale' | 'auction', id: string) => {
+    if (!window.confirm("Are you sure you want to delete this uploaded item?")) return;
+    try {
+      if (type === 'card') {
+        await deleteCard(id);
+        setCardList(prev => prev.filter(c => c.id !== id));
+      } else if (type === 'news') {
+        await deleteNewsItem(id);
+        setNewsList(prev => prev.filter(n => n.id !== id));
+      } else if (type === 'wholesale') {
+        await deleteWholesalePack(id);
+        setWholesaleList(prev => prev.filter(p => p.id !== id));
+      } else if (type === 'auction') {
+        await deleteAuctionItem(id);
+        setAuctions(prev => prev.filter(a => a.id !== id));
+      }
+      onAddToast("Item successfully deleted!", "success");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete item.");
+    }
+  };
+
+  const renderEditModal = () => {
+    if (!editingItem) return null;
+    const { type, item } = editingItem;
+
+    const handleSaveEdit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      try {
+        if (type === 'card') {
+          const updated = await updateCard(item.id, item);
+          setCardList(prev => prev.map(c => c.id === item.id ? updated : c));
+        } else if (type === 'news') {
+          const updated = await updateNewsItem(item.id, item);
+          setNewsList(prev => prev.map(n => n.id === item.id ? updated : n));
+        } else if (type === 'wholesale') {
+          const updated = await updateWholesalePack(item.id, item);
+          setWholesaleList(prev => prev.map(p => p.id === item.id ? updated : p));
+        } else if (type === 'auction') {
+          const updated = await updateAuctionItem(item.id, item);
+          setAuctions(prev => prev.map(a => a.id === item.id ? updated : a));
+        }
+        onAddToast("Changes saved successfully!", "success");
+        setEditingItem(null);
+      } catch (err) {
+        console.error(err);
+        alert("Failed to save changes.");
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-text">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto flex flex-col">
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 className="text-gray-900 font-extrabold text-sm uppercase">✏️ Edit Uploaded Record</h3>
+            <button type="button" onClick={() => setEditingItem(null)} className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer p-1">×</button>
+          </div>
+          <form onSubmit={handleSaveEdit} className="p-4 flex flex-col gap-3.5 text-[11px]">
+            {type === 'card' && (
+              <>
+                {(item.category === 'dumps' || item.category === 'cvv2' || item.category === 'fullz') && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">BIN</label>
+                      <input type="text" value={item.bin || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, bin: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Bank Name</label>
+                      <input type="text" value={item.bank || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, bank: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Country</label>
+                      <input type="text" value={item.country || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, country: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">State</label>
+                      <input type="text" value={item.state || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, state: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1 col-span-2">
+                      <label className="font-bold">Price ($)</label>
+                      <input type="number" step="0.01" value={item.price || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, price: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                    </div>
+                    <div className="flex flex-col gap-1 col-span-2">
+                      <label className="font-bold">Base Name</label>
+                      <input type="text" value={item.base || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, base: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                  </div>
+                )}
+
+                {item.category === 'banklogs' && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Bank Name</label>
+                      <input type="text" value={item.bank || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, bank: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Balance ($)</label>
+                      <input type="number" step="0.01" value={item.bankBalance || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, bankBalance: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Login Username</label>
+                      <input type="text" value={item.loginUsername || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, loginUsername: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Login Password</label>
+                      <input type="text" value={item.loginPassword || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, loginPassword: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Price ($)</label>
+                      <input type="number" step="0.01" value={item.price || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, price: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                    </div>
+                  </div>
+                )}
+
+                {item.category === 'cashapp' && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Username ($Cashtag)</label>
+                      <input type="text" value={item.cashappUsername || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, cashappUsername: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Email Associated</label>
+                      <input type="text" value={item.cashappEmail || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, cashappEmail: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Balance ($)</label>
+                      <input type="number" step="0.01" value={item.cashappBalance || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, cashappBalance: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Price ($)</label>
+                      <input type="number" step="0.01" value={item.price || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, price: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                    </div>
+                  </div>
+                )}
+
+                {item.category === 'paypal' && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Email</label>
+                      <input type="text" value={item.paypalEmail || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, paypalEmail: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Password</label>
+                      <input type="text" value={item.paypalPassword || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, paypalPassword: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Balance ($)</label>
+                      <input type="number" step="0.01" value={item.paypalBalance || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, paypalBalance: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Price ($)</label>
+                      <input type="number" step="0.01" value={item.price || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, price: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                    </div>
+                  </div>
+                )}
+
+                {item.category === 'rdp' && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">RDP IP Address</label>
+                      <input type="text" value={item.rdpIp || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, rdpIp: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">OS Version</label>
+                      <input type="text" value={item.rdpOs || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, rdpOs: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Country</label>
+                      <input type="text" value={item.rdpCountry || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, rdpCountry: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Price ($)</label>
+                      <input type="number" step="0.01" value={item.price || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, price: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {type === 'news' && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">Title</label>
+                  <input type="text" value={item.title || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, title: e.target.value } })} className="border p-1.5 rounded" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">Content</label>
+                  <textarea value={item.content || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, content: e.target.value } })} className="border p-1.5 rounded h-24" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={!!item.important} onChange={e => setEditingItem({ ...editingItem, item: { ...item, important: e.target.checked } })} id="edit-news-important" />
+                  <label htmlFor="edit-news-important" className="font-bold cursor-pointer">Mark as Important Bulletin</label>
+                </div>
+              </div>
+            )}
+
+            {type === 'wholesale' && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">Pack Name</label>
+                  <input type="text" value={item.name || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, name: e.target.value } })} className="border p-1.5 rounded" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">Count of Cards</label>
+                  <input type="number" value={item.count || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, count: Number(e.target.value) } })} className="border p-1.5 rounded" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">Price ($)</label>
+                  <input type="number" step="0.01" value={item.price || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, price: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">Description</label>
+                  <input type="text" value={item.description || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, description: e.target.value } })} className="border p-1.5 rounded" />
+                </div>
+              </div>
+            )}
+
+            {type === 'auction' && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">BIN</label>
+                  <input type="text" value={item.card?.bin || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, card: { ...item.card, bin: e.target.value } } })} className="border p-1.5 rounded" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">Bank Name</label>
+                  <input type="text" value={item.card?.bank || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, card: { ...item.card, bank: e.target.value } } })} className="border p-1.5 rounded" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">Current Bid ($)</label>
+                  <input type="number" step="0.01" value={item.currentBid || 0} onChange={e => setEditingItem({ ...editingItem, item: { ...item, currentBid: Number(e.target.value) } })} className="border p-1.5 rounded font-mono" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold">End Time</label>
+                  <input type="datetime-local" value={item.endTime?.substring(0, 16) || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, endTime: e.target.value } })} className="border p-1.5 rounded" />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 mt-2">
+              <button type="button" onClick={() => setEditingItem(null)} className="px-4 py-2 border rounded bg-gray-50 hover:bg-gray-100 cursor-pointer">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold cursor-pointer">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const renderManageList = (tab: string) => {
+    const cardCats = ['dumps', 'cvv2', 'fullz', 'banklogs', 'cashapp', 'paypal', 'rdp'];
+    
+    if (cardCats.includes(tab)) {
+      const filteredCards = cardList.filter(c => c.category === tab);
+      return (
+        <div className="border border-gray-200 rounded mt-6 p-4 bg-gray-50/30">
+          <h4 className="font-extrabold text-sm text-gray-800 mb-3 uppercase tracking-wider flex items-center gap-1">📁 Existing {tab.toUpperCase()} Records ({filteredCards.length})</h4>
+          {filteredCards.length === 0 ? (
+            <p className="text-gray-500 italic py-2">No records uploaded in this category yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse bg-white border border-gray-200 rounded text-[11px]">
+                <thead>
+                  <tr className="bg-gray-100 border-b border-gray-200 font-bold text-gray-700">
+                    {tab === 'banklogs' ? (
+                      <>
+                        <th className="p-2">Bank</th>
+                        <th className="p-2">Balance</th>
+                        <th className="p-2">Username</th>
+                        <th className="p-2">Price</th>
+                      </>
+                    ) : tab === 'cashapp' ? (
+                      <>
+                        <th className="p-2">Username</th>
+                        <th className="p-2">Email</th>
+                        <th className="p-2">Balance</th>
+                        <th className="p-2">Price</th>
+                      </>
+                    ) : tab === 'paypal' ? (
+                      <>
+                        <th className="p-2">Email</th>
+                        <th className="p-2">Balance</th>
+                        <th className="p-2">Price</th>
+                      </>
+                    ) : tab === 'rdp' ? (
+                      <>
+                        <th className="p-2">IP / OS</th>
+                        <th className="p-2">Country/State</th>
+                        <th className="p-2">Access Type</th>
+                        <th className="p-2">Price</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="p-2">BIN</th>
+                        <th className="p-2">Bank</th>
+                        <th className="p-2">Country/State</th>
+                        <th className="p-2">Price</th>
+                        <th className="p-2">Base</th>
+                      </>
+                    )}
+                    <th className="p-2 text-center w-24">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredCards.map(c => (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      {tab === 'banklogs' ? (
+                        <>
+                          <td className="p-2 font-bold text-gray-800">{c.bank}</td>
+                          <td className="p-2 font-mono font-bold text-emerald-700">${c.bankBalance ?? 0}</td>
+                          <td className="p-2 font-mono text-gray-600">{c.loginUsername}</td>
+                          <td className="p-2 font-mono font-bold text-gray-800">${c.price}</td>
+                        </>
+                      ) : tab === 'cashapp' ? (
+                        <>
+                          <td className="p-2 font-bold text-[#00D632]">{c.cashappUsername}</td>
+                          <td className="p-2 text-gray-600">{c.cashappEmail}</td>
+                          <td className="p-2 font-mono font-bold text-gray-800">${c.cashappBalance ?? 0}</td>
+                          <td className="p-2 font-mono font-bold text-gray-800">${c.price}</td>
+                        </>
+                      ) : tab === 'paypal' ? (
+                        <>
+                          <td className="p-2 font-bold text-blue-800">{c.paypalEmail}</td>
+                          <td className="p-2 font-mono font-bold text-emerald-700">${c.paypalBalance ?? 0}</td>
+                          <td className="p-2 font-mono font-bold text-gray-800">${c.price}</td>
+                        </>
+                      ) : tab === 'rdp' ? (
+                        <>
+                          <td className="p-2 font-bold text-gray-800">{c.rdpIp} <span className="text-gray-400 font-normal">({c.rdpOs})</span></td>
+                          <td className="p-2 font-mono text-gray-600">{c.rdpCountry} / {c.rdpState}</td>
+                          <td className="p-2 text-gray-600">{c.rdpAccessType}</td>
+                          <td className="p-2 font-mono font-bold text-gray-800">${c.price}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-2 font-mono font-bold text-blue-700">{c.bin}</td>
+                          <td className="p-2 text-gray-800">{c.bank}</td>
+                          <td className="p-2 font-mono text-gray-600">{c.country} / {c.state}</td>
+                          <td className="p-2 font-mono font-bold text-emerald-700">${c.price}</td>
+                          <td className="p-2 font-mono text-gray-500">{c.base}</td>
+                        </>
+                      )}
+                      <td className="p-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button type="button" onClick={() => setEditingItem({ type: 'card', item: c })} className="px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer font-bold">Edit</button>
+                          <button type="button" onClick={() => handleDeleteItem('card', c.id)} className="px-2 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded border border-red-200 cursor-pointer font-bold">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (tab === 'wholesale') {
+      return (
+        <div className="border border-gray-200 rounded mt-6 p-4 bg-gray-50/30">
+          <h4 className="font-extrabold text-sm text-gray-800 mb-3 uppercase tracking-wider flex items-center gap-1">📁 Existing WholesaleCombo Packs ({wholesaleList.length})</h4>
+          {wholesaleList.length === 0 ? (
+            <p className="text-gray-500 italic py-2">No wholesale combo packs uploaded yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse bg-white border border-gray-200 rounded text-[11px]">
+                <thead>
+                  <tr className="bg-gray-100 border-b border-gray-200 font-bold text-gray-700">
+                    <th className="p-2">Pack Name</th>
+                    <th className="p-2">Count</th>
+                    <th className="p-2">Price</th>
+                    <th className="p-2">Country/Type</th>
+                    <th className="p-2">Description</th>
+                    <th className="p-2 text-center w-24">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {wholesaleList.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="p-2 font-bold text-gray-800">{p.name}</td>
+                      <td className="p-2 font-mono text-gray-600">{p.count} cards</td>
+                      <td className="p-2 font-mono font-bold text-emerald-700">${p.price}</td>
+                      <td className="p-2 font-mono text-gray-600">{p.country} / {p.type}</td>
+                      <td className="p-2 text-gray-500 max-w-xs truncate">{p.description}</td>
+                      <td className="p-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button type="button" onClick={() => setEditingItem({ type: 'wholesale', item: p })} className="px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer font-bold">Edit</button>
+                          <button type="button" onClick={() => handleDeleteItem('wholesale', p.id)} className="px-2 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded border border-red-200 cursor-pointer font-bold">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (tab === 'auction') {
+      return (
+        <div className="border border-gray-200 rounded mt-6 p-4 bg-gray-50/30">
+          <h4 className="font-extrabold text-sm text-gray-800 mb-3 uppercase tracking-wider flex items-center gap-1">📁 Existing Auction Items ({auctions.length})</h4>
+          {auctions.length === 0 ? (
+            <p className="text-gray-500 italic py-2">No auctions active yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse bg-white border border-gray-200 rounded text-[11px]">
+                <thead>
+                  <tr className="bg-gray-100 border-b border-gray-200 font-bold text-gray-700">
+                    <th className="p-2">BIN</th>
+                    <th className="p-2">Bank</th>
+                    <th className="p-2">Country / State</th>
+                    <th className="p-2">Starting Bid</th>
+                    <th className="p-2">Current Bid</th>
+                    <th className="p-2">Bids</th>
+                    <th className="p-2 text-center w-24">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {auctions.map(a => (
+                    <tr key={a.id} className="hover:bg-gray-50">
+                      <td className="p-2 font-mono font-bold text-purple-700">{a.card.bin}</td>
+                      <td className="p-2 text-gray-800">{a.card.bank}</td>
+                      <td className="p-2 font-mono text-gray-600">{a.card.country} / {a.card.state}</td>
+                      <td className="p-2 font-mono text-gray-500">${a.currentBid}</td>
+                      <td className="p-2 font-mono font-bold text-emerald-700">${a.currentBid}</td>
+                      <td className="p-2 font-mono text-gray-500">{a.bidsCount} bids</td>
+                      <td className="p-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button type="button" onClick={() => setEditingItem({ type: 'auction', item: a })} className="px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer font-bold">Edit</button>
+                          <button type="button" onClick={() => handleDeleteItem('auction', a.id)} className="px-2 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded border border-red-200 cursor-pointer font-bold">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (tab === 'news') {
+      return (
+        <div className="border border-gray-200 rounded mt-6 p-4 bg-gray-50/30">
+          <h4 className="font-extrabold text-sm text-gray-800 mb-3 uppercase tracking-wider flex items-center gap-1">📁 Existing Bulletins ({newsList.length})</h4>
+          {newsList.length === 0 ? (
+            <p className="text-gray-500 italic py-2">No bulletin posts created yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse bg-white border border-gray-200 rounded text-[11px]">
+                <thead>
+                  <tr className="bg-gray-100 border-b border-gray-200 font-bold text-gray-700">
+                    <th className="p-2 w-1/4">Title</th>
+                    <th className="p-2 w-1/2">Content</th>
+                    <th className="p-2">Important</th>
+                    <th className="p-2 text-center w-24">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {newsList.map(n => (
+                    <tr key={n.id} className="hover:bg-gray-50">
+                      <td className="p-2 font-bold text-gray-800">{n.title}</td>
+                      <td className="p-2 text-gray-600 max-w-sm truncate">{n.content}</td>
+                      <td className="p-2 font-mono text-gray-500">{n.important ? "🔥 YES" : "NO"}</td>
+                      <td className="p-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button type="button" onClick={() => setEditingItem({ type: 'news', item: n })} className="px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer font-bold">Edit</button>
+                          <button type="button" onClick={() => handleDeleteItem('news', n.id)} className="px-2 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded border border-red-200 cursor-pointer font-bold">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   // Single card submission
   const handleSingleSubmit = async (e: React.FormEvent) => {
@@ -722,7 +1229,8 @@ export default function AdminPanel({
 
       {/* TAB 1: Upload Dumps */}
       {adminTab === 'dumps' && (
-        <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-6">
+          <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-3 bg-blue-50/50 p-3 rounded border border-blue-200 text-blue-900 font-bold mb-2">
             Add New Dumps Item (Track 1/2 Records)
           </div>
@@ -880,7 +1388,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.price}
+              value={safeNum(singleCard.price)}
               onChange={e => setSingleCard(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
               className="border border-emerald-300 rounded p-2 focus:outline-none focus:border-emerald-500 font-mono font-bold text-emerald-950"
               required
@@ -927,11 +1435,14 @@ export default function AdminPanel({
             </button>
           </div>
         </form>
-      )}
+        {renderManageList('dumps')}
+      </div>
+    )}
 
       {/* TAB 1.5: Upload CVV2 */}
       {adminTab === 'cvv2' && (
-        <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-6">
+          <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-3 bg-purple-50/50 p-3 rounded border border-purple-200 text-purple-900 font-bold mb-2">
             Add New CVV2 Card Item
           </div>
@@ -1114,7 +1625,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.price}
+              value={safeNum(singleCard.price)}
               onChange={e => setSingleCard(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
               className="border border-emerald-300 rounded p-2 focus:outline-none focus:border-emerald-500 font-mono font-bold text-emerald-950"
               required
@@ -1184,11 +1695,14 @@ export default function AdminPanel({
             </button>
           </div>
         </form>
-      )}
+        {renderManageList('cvv2')}
+      </div>
+    )}
 
       {/* TAB 1.6: Upload Fullz */}
       {adminTab === 'fullz' && (
-        <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-6">
+          <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-3 bg-indigo-50/50 p-3 rounded border border-indigo-200 text-indigo-900 font-bold mb-2">
             Add New Fullz Profile (Complete Person Info)
           </div>
@@ -1402,7 +1916,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.price}
+              value={safeNum(singleCard.price)}
               onChange={e => setSingleCard(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
               className="border border-emerald-300 rounded p-2 focus:outline-none focus:border-emerald-500 font-mono font-bold text-emerald-950"
               required
@@ -1438,11 +1952,14 @@ export default function AdminPanel({
             </button>
           </div>
         </form>
-      )}
+        {renderManageList('fullz')}
+      </div>
+    )}
 
       {/* TAB 1.7: Upload Bank Logs */}
       {adminTab === 'banklogs' && (
-        <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-6">
+          <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-3 bg-[#e8f4fd] p-3 rounded border border-blue-200 text-blue-900 font-bold mb-2">
             Add New Bank Login Record
           </div>
@@ -1493,7 +2010,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.bankBalance || 0}
+              value={safeNum(singleCard.bankBalance)}
               onChange={e => setSingleCard(prev => ({ ...prev, bankBalance: parseFloat(e.target.value) }))}
               className="border border-blue-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono font-bold text-blue-950"
               required
@@ -1564,7 +2081,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.price}
+              value={safeNum(singleCard.price)}
               onChange={e => setSingleCard(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
               className="border border-emerald-300 rounded p-2 focus:outline-none focus:border-emerald-500 font-mono font-bold text-emerald-950"
               required
@@ -1589,11 +2106,14 @@ export default function AdminPanel({
             </button>
           </div>
         </form>
-      )}
+        {renderManageList('banklogs')}
+      </div>
+    )}
 
       {/* TAB 1.8: Upload CashApp */}
       {adminTab === 'cashapp' && (
-        <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-6">
+          <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-3 bg-emerald-50 p-3 rounded border border-emerald-200 text-emerald-900 font-bold mb-2">
             Add New CashApp Account Item
           </div>
@@ -1617,7 +2137,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.cashappBalance || 0}
+              value={safeNum(singleCard.cashappBalance)}
               onChange={e => setSingleCard(prev => ({ ...prev, cashappBalance: parseFloat(e.target.value) }))}
               className="border border-gray-300 rounded p-2 focus:outline-none font-mono font-bold"
               required
@@ -1686,7 +2206,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.price}
+              value={safeNum(singleCard.price)}
               onChange={e => setSingleCard(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
               className="border border-emerald-300 rounded p-2 focus:outline-none font-mono font-bold text-emerald-950"
               required
@@ -1711,11 +2231,14 @@ export default function AdminPanel({
             </button>
           </div>
         </form>
-      )}
+        {renderManageList('cashapp')}
+      </div>
+    )}
 
       {/* TAB 1.9: Upload PayPal */}
       {adminTab === 'paypal' && (
-        <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-6">
+          <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-3 bg-blue-50 p-3 rounded border border-blue-200 text-blue-900 font-bold mb-2">
             Add New PayPal Verified Account
           </div>
@@ -1749,7 +2272,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.paypalBalance || 0}
+              value={safeNum(singleCard.paypalBalance)}
               onChange={e => setSingleCard(prev => ({ ...prev, paypalBalance: parseFloat(e.target.value) }))}
               className="border border-gray-300 rounded p-2 focus:outline-none font-mono font-bold"
               required
@@ -1784,7 +2307,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.price}
+              value={safeNum(singleCard.price)}
               onChange={e => setSingleCard(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
               className="border border-emerald-300 rounded p-2 focus:outline-none font-mono font-bold text-emerald-950"
               required
@@ -1819,11 +2342,14 @@ export default function AdminPanel({
             </button>
           </div>
         </form>
-      )}
+        {renderManageList('paypal')}
+      </div>
+    )}
 
       {/* TAB 1.10: Upload RDP/VPS */}
       {adminTab === 'rdp' && (
-        <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-6">
+          <form onSubmit={handleSingleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-3 bg-indigo-50 p-3 rounded border border-indigo-200 text-indigo-900 font-bold mb-2">
             Add New Remote Desktop Protocol (RDP) / VPS Server
           </div>
@@ -1954,7 +2480,7 @@ export default function AdminPanel({
             <input
               type="number"
               step="0.01"
-              value={singleCard.price}
+              value={safeNum(singleCard.price)}
               onChange={e => setSingleCard(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
               className="border border-emerald-300 rounded p-2 focus:outline-none font-mono font-bold text-emerald-950"
               required
@@ -1979,7 +2505,9 @@ export default function AdminPanel({
             </button>
           </div>
         </form>
-      )}
+        {renderManageList('rdp')}
+      </div>
+    )}
 
       {/* TAB 2: Bulk upload */}
       {adminTab === 'bulk' && (
@@ -2118,6 +2646,7 @@ export default function AdminPanel({
               </button>
             </div>
           </form>
+          {renderManageList('news')}
         </div>
       )}
 
@@ -2215,6 +2744,7 @@ export default function AdminPanel({
               </button>
             </div>
           </form>
+          {renderManageList('wholesale')}
         </div>
       )}
 
@@ -2335,6 +2865,7 @@ export default function AdminPanel({
               </button>
             </div>
           </form>
+          {renderManageList('auction')}
         </div>
       )}
 
@@ -2658,6 +3189,7 @@ export default function AdminPanel({
         </form>
       )}
 
+      {renderEditModal()}
     </div>
   );
 }

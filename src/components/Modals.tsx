@@ -140,20 +140,6 @@ export default function Modals({ user, setUser, onAddFunds, onAddToast, paymentA
   }, [nowpayment, user.addFundsOpen]);
 
   if (user.addFundsOpen) {
-    const addressMap = {
-      btc: paymentAddresses?.btcAddress || 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
-      usdt: paymentAddresses?.usdtAddress || 'TR7NHqfe61L19L9fHX2989c56G7999jW53',
-      eth: paymentAddresses?.ethAddress || '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-      ltc: paymentAddresses?.ltcAddress || 'LQP92mxC9G9888AsXgH66688hS7sdfsF',
-    };
-
-    const handleCopy = (address: string) => {
-      navigator.clipboard.writeText(address);
-      setCopied(true);
-      onAddToast('Deposit address copied to clipboard!', 'success');
-      setTimeout(() => setCopied(false), 2000);
-    };
-
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden border border-gray-200">
@@ -280,32 +266,9 @@ export default function Modals({ user, setUser, onAddFunds, onAddToast, paymentA
                   </div>
                 </div>
 
-                <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="font-semibold text-gray-800">Send funds to address:</span>
-                    <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded uppercase font-mono">
-                      {depositMethod.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex gap-1.5 items-stretch mt-1.5">
-                    <p className="font-mono bg-white p-2 rounded border border-gray-300 break-all select-all text-[10px] text-gray-600 flex-grow font-semibold">
-                      {addressMap[depositMethod]}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(addressMap[depositMethod])}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded border border-gray-300 transition-all flex items-center justify-center cursor-pointer"
-                      title="Copy to clipboard"
-                    >
-                      {copied ? (
-                        <Check className="w-3.5 h-3.5 text-green-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-[10px] font-bold text-rose-600 mt-2.5 flex items-center gap-1.5">
-                    <span className="bg-rose-100 text-rose-700 font-extrabold px-1.5 py-0.5 rounded text-[9px]">CONFIRM NETWORK:</span>
+                <div className="bg-gray-50 p-3 rounded border border-gray-100">
+                  <p className="text-[10px] font-bold text-rose-600 flex items-center gap-1.5">
+                    <span className="bg-rose-100 text-rose-700 font-extrabold px-1.5 py-0.5 rounded text-[9px]">EXPECTED NETWORK:</span>
                     <span className="underline uppercase tracking-wide">
                       {depositMethod === 'btc' && 'Bitcoin (BTC) Network'}
                       {depositMethod === 'usdt' && 'USDT TRC-20 (TRON Network)'}
@@ -314,7 +277,7 @@ export default function Modals({ user, setUser, onAddFunds, onAddToast, paymentA
                     </span>
                   </p>
                   <p className="text-[10px] text-gray-500 mt-1">
-                    * Please ensure you send only via the specified network. Sending to the wrong network will result in permanent loss of funds.
+                    * The payment gateway requires payment on the specific network listed above.
                   </p>
                 </div>
 
@@ -370,14 +333,14 @@ export default function Modals({ user, setUser, onAddFunds, onAddToast, paymentA
           <div className="p-5 text-xs text-gray-700 leading-relaxed flex flex-col gap-3">
             <p className="font-semibold text-gray-900">What is the Crab Rating?</p>
             <p>
-              Your <strong>Crab Rating</strong> reflects your account status and volume history in our diagnostic sandbox.
+              Your <strong>Crab Rating</strong> reflects your account status and volume history in our system.
               Higher crab ratings represent premium status in the community.
             </p>
             <div className="bg-amber-50 border border-amber-200 rounded p-3 text-[11px] text-amber-900">
               <p className="font-semibold mb-1">How to boost Crab Rating:</p>
               <ul className="list-disc pl-4 flex flex-col gap-1">
                 <li>Purchase CVV/BIN packs from CVV2, Dumps, or Fullz (+10 crabs per card)</li>
-                <li>Add funds to top-up your sandbox balance (+15 crabs per top-up)</li>
+                <li>Add funds to top-up your account balance (+15 crabs per top-up)</li>
                 <li>Activate your account status (+20 crabs bonus)</li>
                 <li>Participate in system lottery draws (+5 crabs console prize)</li>
               </ul>
@@ -542,14 +505,35 @@ export default function Modals({ user, setUser, onAddFunds, onAddToast, paymentA
   }
 
   if (user.giftOpen) {
-    const handleClaimGift = () => {
+    const giftClaimKey = `last_gift_claim_${user.email}`;
+    const lastClaimStr = localStorage.getItem(giftClaimKey);
+    const todayStr = new Date().toDateString();
+    const hasClaimedToday = lastClaimStr === todayStr;
+
+    const handleClaimGift = async () => {
+      if (hasClaimedToday) {
+        onAddToast('You have already claimed your daily gift today!', 'info');
+        return;
+      }
+
+      const giftAmount = 1.00;
+      const newBalance = user.balance + giftAmount;
+
+      try {
+        const { updateUserProfile } = await import('../utils/dbService');
+        await updateUserProfile(user.email, { balance: newBalance });
+      } catch (err) {
+        console.error("Failed to persist balance on gift claim:", err);
+      }
+
+      localStorage.setItem(giftClaimKey, todayStr);
+
       setUser(prev => ({
         ...prev,
-        balance: prev.balance + 10,
-        crabRating: prev.crabRating + 5,
+        balance: newBalance,
         giftOpen: false,
       }));
-      onAddToast('Claimed daily loyalty gift of $10.00!', 'success');
+      onAddToast('Claimed daily loyalty gift of $1.00!', 'success');
     };
 
     return (
@@ -570,24 +554,35 @@ export default function Modals({ user, setUser, onAddFunds, onAddToast, paymentA
             <div>
               <h4 className="font-extrabold text-gray-900 text-sm">Daily Credit Pack</h4>
               <p className="text-gray-500 mt-1">
-                Thank you for using Protocol! We have rewarded your loyalty with a free credit voucher.
+                {hasClaimedToday
+                  ? "You have already claimed your daily gift. Come back tomorrow!"
+                  : "Thank you for using Protocol! We have rewarded your loyalty with a free daily credit voucher."}
               </p>
             </div>
 
             <div className="bg-orange-50 border border-orange-200 rounded p-3 text-orange-950 text-left">
               <p className="font-bold text-[11px] mb-1">🎁 Box Contents:</p>
               <ul className="list-disc pl-4 flex flex-col gap-1 text-[11px]">
-                <li>+$10.00 Wallet Funds</li>
-                <li>+5 Crabs Rating multiplier</li>
+                <li>+$1.00 Wallet Funds</li>
+                <li>+1 Loyalty Streak credit</li>
               </ul>
             </div>
 
-            <button
-              onClick={handleClaimGift}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded transition-colors cursor-pointer text-xs uppercase shadow"
-            >
-              Claim Reward Now
-            </button>
+            {hasClaimedToday ? (
+              <button
+                disabled
+                className="w-full bg-gray-300 text-gray-600 font-bold py-2 rounded text-xs uppercase cursor-not-allowed border border-gray-300"
+              >
+                Claimed Today
+              </button>
+            ) : (
+              <button
+                onClick={handleClaimGift}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded transition-colors cursor-pointer text-xs uppercase shadow border border-orange-500"
+              >
+                Claim Reward Now
+              </button>
+            )}
           </div>
         </div>
       </div>
