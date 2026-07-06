@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Gavel, Clock, Trophy, RefreshCw } from 'lucide-react';
 import { AuctionItem, UserProfile } from '../types';
-import { updateAuctionBid, updateUserProfile } from '../utils/dbService';
+import { updateAuctionBid, updateUserProfile, updateAuctionItem } from '../utils/dbService';
 
 interface AuctionViewProps {
   auctions: AuctionItem[];
@@ -38,6 +38,17 @@ export default function AuctionView({ auctions, setAuctions, user, setUser, onAd
     return () => clearInterval(interval);
   }, [auctions]);
 
+  // Mask helper for bidding usernames
+  const maskUsername = (username: string): string => {
+    if (!username) return 'Anonymous';
+    const parts = username.split('@');
+    const name = parts[0];
+    if (name.length <= 3) {
+      return name[0] + '***' + (parts[1] ? '@' + parts[1].split('.')[0] : '');
+    }
+    return name.substring(0, 2) + '***' + name.substring(name.length - 1) + (parts[1] ? '@' + parts[1].split('.')[0] : '');
+  };
+
   // Simulated adversary bidders bidding against the user!
   useEffect(() => {
     const rivalBidTimer = setInterval(() => {
@@ -48,21 +59,47 @@ export default function AuctionView({ auctions, setAuctions, user, setUser, onAd
 
         // Only bid if the auction hasn't ended
         const diff = new Date(target.endTime).getTime() - Date.now();
-        if (diff <= 0) return;
+        if (diff <= 0 || target.ended) return;
 
-        const bidIncrease = Math.floor(Math.random() * 3) + 0.5;
+        const bidIncrease = Math.floor(Math.random() * 3) + 0.50;
         const nextBid = target.currentBid + bidIncrease;
+
+        const rivals = ['sarah_connor@gmail.com', 'michael_scott@dunder.com', 'bruce_wayne@waynecorp.com', 'selina_kyle@gotham.org', 'clark_kent@dailyplanet.com'];
+        const selectRival = rivals[Math.floor(Math.random() * rivals.length)];
 
         setAuctions(prev => prev.map((item, idx) => {
           if (idx === targetIndex) {
-            // If the user was leading, outbid them!
-            if (item.myBid > 0 && item.myBid === item.currentBid) {
-              onAddToast(`⚠️ You have been outbid on BIN ${item.card.bin}! New bid: $${nextBid.toFixed(2)}`, 'info');
+            // If the current logged-in user was leading, outbid them and refund!
+            if (item.highestBidder === user.email && item.myBid > 0) {
+              onAddToast(`⚠️ You have been outbid on BIN ${item.card.bin}! New bid: $${nextBid.toFixed(2)}. Your locked bid has been refunded.`, 'info');
+              // Refund the user immediately
+              const refundAmount = item.myBid;
+              updateUserProfile(user.email, { balance: user.balance + refundAmount }).then(() => {
+                setUser(prevUser => ({ ...prevUser, balance: prevUser.balance + refundAmount }));
+              });
             }
+
+            const updatedBidders = [...(item.biddersList || []), {
+              username: selectRival,
+              bidAmount: nextBid,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }];
+
+            updateAuctionItem(item.id, {
+              currentBid: nextBid,
+              highestBidder: selectRival,
+              bidsCount: item.bidsCount + 1,
+              biddersList: updatedBidders
+            });
+
             return {
               ...item,
               currentBid: nextBid,
+              highestBidder: selectRival,
               bidsCount: item.bidsCount + 1,
+              biddersList: updatedBidders,
+              // Since user was outbid, reset their local active bid state
+              myBid: item.highestBidder === user.email ? 0 : item.myBid,
             };
           }
           return item;
@@ -71,39 +108,60 @@ export default function AuctionView({ auctions, setAuctions, user, setUser, onAd
     }, 15000);
 
     return () => clearInterval(rivalBidTimer);
-  }, [auctions, onAddToast]);
+  }, [auctions, onAddToast, user, setUser]);
 
   const handlePlaceBid = async (itemId: string) => {
+    if (user.accountStatus === 'inactive') {
+      onAddToast("Unable to bid. Your account is inactive. Please activate your account first.", 'info');
+      return;
+    }
+
     const item = auctions.find(a => a.id === itemId);
-    if (!item) return;
+    if (!item || item.ended) return;
 
     const bidVal = parseFloat(bidInputs[itemId] || '0');
     const minBid = item.currentBid + 0.50;
 
     if (isNaN(bidVal) || bidVal < minBid) {
-      alert(`Invalid bid. Minimum bid must be at least $${minBid.toFixed(2)}`);
+      onAddToast(`Invalid bid. Minimum bid must be at least $${minBid.toFixed(2)}`, 'info');
       return;
     }
 
-    if (user.balance < bidVal) {
-      alert('Insufficient balance in your wallet to place this bid.');
+    // Since users locked bid is item.myBid, they only need to supply the extra increment!
+    const extraFundsNeeded = item.highestBidder === user.email ? (bidVal - item.myBid) : bidVal;
+
+    if (user.balance < extraFundsNeeded) {
+      onAddToast('Insufficient balance in your wallet to place this bid.', 'info');
       return;
     }
 
     try {
-      const newBalance = user.balance - bidVal;
+      const newBalance = user.balance - extraFundsNeeded;
       await updateUserProfile(user.email, { balance: newBalance });
-      await updateAuctionBid(itemId, bidVal, item.bidsCount + 1, bidVal);
-
       setUser(prev => ({ ...prev, balance: newBalance }));
+
+      const updatedBidders = [...(item.biddersList || []), {
+        username: user.email,
+        bidAmount: bidVal,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }];
+
+      await updateAuctionItem(itemId, {
+        currentBid: bidVal,
+        highestBidder: user.email,
+        bidsCount: item.bidsCount + 1,
+        biddersList: updatedBidders
+      });
 
       setAuctions(prev => prev.map(a => {
         if (a.id === itemId) {
           return {
             ...a,
             currentBid: bidVal,
+            highestBidder: user.email,
             myBid: bidVal,
             bidsCount: a.bidsCount + 1,
+            biddersList: updatedBidders,
           };
         }
         return a;

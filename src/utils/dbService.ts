@@ -7,6 +7,7 @@ export interface SystemSettings {
   ltcAddress: string;
   ethAddress: string;
   usdtAddress: string;
+  telegramUsername: string;
 }
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -14,28 +15,40 @@ const DEFAULT_SETTINGS: SystemSettings = {
   ltcAddress: 'LQL9YgSTB968i99684396843968',
   ethAddress: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
   usdtAddress: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
+  telegramUsername: '@protocolcc_bot',
 };
 
 // Detect if Supabase is fully configured
 export const isSupabaseConfigured = (): boolean => {
   const url = (import.meta as any).env.VITE_SUPABASE_URL;
   const key = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
-  return !!(url && url !== 'https://placeholder-project.supabase.co' && key && key !== 'placeholder-anon-key');
+  if (!url || !key) return false;
+  if (url.includes('placeholder-project') || url.includes('YOUR_PROJECT_ID')) return false;
+  if (key.includes('placeholder-anon-key') || key.includes('YOUR_ACTUAL_SUPABASE_ANON_KEY')) return false;
+  return true;
 };
 
 // --- MAPPING HELPERS ---
 function mapProfileToTS(dbProfile: any): UserProfile & { role: 'admin' | 'customer' } {
+  const isAdmin = dbProfile.email.toLowerCase() === 'patrickkamande10455@gmail.com';
+  const balanceVal = Number(dbProfile.balance ?? 0);
+  let status = dbProfile.account_status || (isAdmin ? 'active' : 'inactive');
+  
+  if (!isAdmin && balanceVal <= 0) {
+    status = 'inactive';
+  }
+
   return {
     email: dbProfile.email,
     username: dbProfile.username || dbProfile.email.split('@')[0],
     role: dbProfile.role as 'admin' | 'customer',
-    balance: Number(dbProfile.balance ?? 0),
+    balance: balanceVal,
     crabRating: Number(dbProfile.crab_rating ?? 5),
     crabsDetailsOpen: !!dbProfile.crabs_details_open,
     addFundsOpen: !!dbProfile.add_funds_open,
     lotteryOpen: !!dbProfile.lottery_open,
     giftOpen: !!dbProfile.gift_open,
-    accountStatus: dbProfile.account_status || 'active',
+    accountStatus: status as 'active' | 'inactive',
     creationDate: dbProfile.creation_date || new Date().toISOString().split('T')[0],
     password: dbProfile.password || '',
   };
@@ -253,7 +266,16 @@ function mapCardToDB(tsCard: any): any {
   if (tsCard.rdpAccessType) extra.rdpAccessType = tsCard.rdpAccessType;
   if (tsCard.rdpHospeed) extra.rdpHospeed = tsCard.rdpHospeed;
 
-  if (Object.keys(extra).length > 0) {
+  if (tsCard.ownRent) extra.ownRent = tsCard.ownRent;
+  if (tsCard.yearsAtResidence) extra.yearsAtResidence = tsCard.yearsAtResidence;
+  if (tsCard.incomeType) extra.incomeType = tsCard.incomeType;
+  if (tsCard.employer) extra.employer = tsCard.employer;
+  if (tsCard.occupation) extra.occupation = tsCard.occupation;
+  if (tsCard.yearsEmployed) extra.yearsEmployed = tsCard.yearsEmployed;
+  if (tsCard.workPhone) extra.workPhone = tsCard.workPhone;
+  if (tsCard.netMonthlyIncome) extra.netMonthlyIncome = tsCard.netMonthlyIncome;
+
+  if (Object.keys(extra).length > 0 && !tsCard.fullAddressStr) {
     dbCard.full_address_str = JSON.stringify(extra);
   }
 
@@ -430,7 +452,7 @@ function mapDumpToDB(tsCard: any): any {
 }
 
 function mapFullzToTS(dbFullz: any): CardItem {
-  return {
+  const card: CardItem = {
     id: dbFullz.id,
     bin: dbFullz.bin,
     zip: dbFullz.zip,
@@ -473,8 +495,18 @@ function mapFullzToTS(dbFullz: any): CardItem {
     fullEmailPassword: dbFullz.full_email_password || undefined,
     fullAccountNumber: dbFullz.full_account_number || undefined,
     fullRoutingNumber: dbFullz.full_routing_number || undefined,
+    ownRent: dbFullz.own_rent || undefined,
+    yearsAtResidence: dbFullz.years_at_residence || undefined,
+    incomeType: dbFullz.income_type || undefined,
+    employer: dbFullz.employer || undefined,
+    occupation: dbFullz.occupation || undefined,
+    yearsEmployed: dbFullz.years_employed || undefined,
+    workPhone: dbFullz.work_phone || undefined,
+    netMonthlyIncome: dbFullz.net_monthly_income || undefined,
     category: 'fullz',
   };
+
+  return card;
 }
 
 function mapFullzToDB(tsFullz: any): any {
@@ -504,7 +536,6 @@ function mapFullzToDB(tsFullz: any): any {
     phone: !!tsFullz.phone,
     email: !!tsFullz.email,
     email_password: !!tsFullz.emailPassword,
-    without_cvv2: !!tsFullz.withoutCvv2,
     base: tsFullz.base,
     card_number: tsFullz.cardNumber || null,
     cvv: tsFullz.cvv || null,
@@ -520,12 +551,22 @@ function mapFullzToDB(tsFullz: any): any {
     full_email_password: tsFullz.fullEmailPassword || null,
     full_account_number: tsFullz.fullAccountNumber || null,
     full_routing_number: tsFullz.fullRoutingNumber || null,
+    own_rent: tsFullz.ownRent || null,
+    years_at_residence: tsFullz.yearsAtResidence || null,
+    income_type: tsFullz.incomeType || null,
+    employer: tsFullz.employer || null,
+    occupation: tsFullz.occupation || null,
+    years_employed: tsFullz.yearsEmployed || null,
+    work_phone: tsFullz.workPhone || null,
+    net_monthly_income: tsFullz.netMonthlyIncome || null,
   };
+
   Object.keys(dbFullz).forEach(key => {
     if (dbFullz[key] === null || dbFullz[key] === undefined) {
       delete dbFullz[key];
     }
   });
+
   return dbFullz;
 }
 
@@ -793,9 +834,16 @@ function mapAuctionToTS(dbAuc: any): AuctionItem {
 function getLocalProfile(email: string): any {
   const key = `profile_${email.toLowerCase()}`;
   const stored = localStorage.getItem(key);
-  if (stored) return JSON.parse(stored);
-  
   const isAdmin = email.toLowerCase() === 'patrickkamande10455@gmail.com';
+  
+  if (stored) {
+    const prof = JSON.parse(stored);
+    if (!isAdmin && (prof.balance ?? 0) <= 0) {
+      prof.accountStatus = 'inactive';
+    }
+    return prof;
+  }
+  
   const newProf = {
     email: email.toLowerCase(),
     username: email.split('@')[0],
@@ -806,7 +854,7 @@ function getLocalProfile(email: string): any {
     addFundsOpen: false,
     lotteryOpen: false,
     giftOpen: false,
-    accountStatus: 'active',
+    accountStatus: isAdmin ? 'active' : 'inactive',
     creationDate: new Date().toISOString().split('T')[0],
   };
   localStorage.setItem(key, JSON.stringify(newProf));
@@ -848,7 +896,7 @@ export async function getUserProfile(email: string): Promise<UserProfile & { rol
         add_funds_open: false,
         lottery_open: false,
         gift_open: false,
-        account_status: 'active',
+        account_status: isAdmin ? 'active' : 'inactive',
         creation_date: new Date().toISOString().split('T')[0],
       };
       
@@ -928,7 +976,7 @@ export async function registerUserProfile(email: string, username: string, passw
         add_funds_open: false,
         lottery_open: false,
         gift_open: false,
-        account_status: 'active',
+        account_status: isAdmin ? 'active' : 'inactive',
         creation_date: new Date().toISOString().split('T')[0],
       };
       await supabase.from('profiles').insert(newProf);
@@ -994,8 +1042,8 @@ export async function getCards(): Promise<CardItem[]> {
   if (!isSupabaseConfigured()) {
     const stored = localStorage.getItem('cards_list');
     if (stored) return JSON.parse(stored);
-    localStorage.setItem('cards_list', JSON.stringify([]));
-    return [];
+    localStorage.setItem('cards_list', JSON.stringify(mockCardsList));
+    return mockCardsList;
   }
 
   try {
@@ -1019,7 +1067,7 @@ export async function getCards(): Promise<CardItem[]> {
     const paypalList = (paypalRes.data || []).map(mapPayPalToTS);
     const rdpList = (rdpRes.data || []).map(mapRDPToTS);
 
-    return [
+    const combined = [
       ...cvvsList,
       ...dumpsList,
       ...fullzList,
@@ -1029,11 +1077,13 @@ export async function getCards(): Promise<CardItem[]> {
       ...rdpList,
       ...cardsList
     ];
+
+    return combined;
   } catch (err) {
     console.error("Supabase getCards failed, using local:", err);
     const stored = localStorage.getItem('cards_list');
     if (stored) return JSON.parse(stored);
-    return [];
+    return mockCardsList;
   }
 }
 
@@ -1254,8 +1304,8 @@ export async function getNews(): Promise<NewsItem[]> {
   if (!isSupabaseConfigured()) {
     const stored = localStorage.getItem('news_list');
     if (stored) return JSON.parse(stored);
-    localStorage.setItem('news_list', JSON.stringify([]));
-    return [];
+    localStorage.setItem('news_list', JSON.stringify(mockNews));
+    return mockNews;
   }
 
   try {
@@ -1265,22 +1315,20 @@ export async function getNews(): Promise<NewsItem[]> {
       .order('date', { ascending: false });
 
     if (error) throw error;
-    if (!data || data.length === 0) {
-      return [];
-    }
+    const list = data || [];
 
-    return data.map(n => ({
+    return list.map(n => ({
       id: n.id,
       title: n.title,
       content: n.content,
       important: n.important,
-      date: n.date.split('T')[0],
+      date: typeof n.date === 'string' ? n.date.split('T')[0] : new Date().toISOString().split('T')[0],
     }));
   } catch (err) {
     console.error("Supabase getNews failed, using local:", err);
     const stored = localStorage.getItem('news_list');
     if (stored) return JSON.parse(stored);
-    return [];
+    return mockNews;
   }
 }
 
@@ -1394,8 +1442,8 @@ export async function getWholesalePacks(): Promise<WholesalePack[]> {
   if (!isSupabaseConfigured()) {
     const stored = localStorage.getItem('wholesale_list');
     if (stored) return JSON.parse(stored);
-    localStorage.setItem('wholesale_list', JSON.stringify([]));
-    return [];
+    localStorage.setItem('wholesale_list', JSON.stringify(mockWholesalePacks));
+    return mockWholesalePacks;
   }
 
   try {
@@ -1404,11 +1452,9 @@ export async function getWholesalePacks(): Promise<WholesalePack[]> {
       .select('*');
 
     if (error) throw error;
-    if (!data || data.length === 0) {
-      return [];
-    }
+    const list = data || [];
 
-    return data.map(p => ({
+    return list.map(p => ({
       id: p.id,
       name: p.name,
       count: Number(p.count),
@@ -1416,10 +1462,13 @@ export async function getWholesalePacks(): Promise<WholesalePack[]> {
       description: p.description,
       country: p.country,
       type: p.type,
+      cardsDetails: p.cardsDetails || (p.cards_details ? (typeof p.cards_details === 'string' ? JSON.parse(p.cards_details) : p.cards_details) : undefined),
     }));
   } catch (err) {
     console.error("Supabase getWholesale failed, using local:", err);
-    return [];
+    const stored = localStorage.getItem('wholesale_list');
+    if (stored) return JSON.parse(stored);
+    return mockWholesalePacks;
   }
 }
 
@@ -1462,6 +1511,7 @@ export async function updateWholesalePack(packId: string, updates: Partial<Whole
     if (updates.description !== undefined) dbPack.description = updates.description;
     if (updates.country !== undefined) dbPack.country = updates.country;
     if (updates.type !== undefined) dbPack.type = updates.type;
+    if (updates.cardsDetails !== undefined) dbPack.cards_details = JSON.stringify(updates.cardsDetails);
 
     const { data, error } = await supabase
       .from('wholesale_packs')
@@ -1479,6 +1529,7 @@ export async function updateWholesalePack(packId: string, updates: Partial<Whole
       description: data.description,
       country: data.country,
       type: data.type,
+      cardsDetails: data.cards_details ? (typeof data.cards_details === 'string' ? JSON.parse(data.cards_details) : data.cards_details) : undefined,
     };
   } catch (err) {
     console.error("Supabase updateWholesalePack error:", err);
@@ -1512,6 +1563,7 @@ export async function addWholesalePack(pack: Omit<WholesalePack, 'id'>): Promise
         description: pack.description,
         country: pack.country,
         type: pack.type,
+        cards_details: pack.cardsDetails ? JSON.stringify(pack.cardsDetails) : null,
       })
       .select('*')
       .single();
@@ -1525,6 +1577,7 @@ export async function addWholesalePack(pack: Omit<WholesalePack, 'id'>): Promise
       description: data.description,
       country: data.country,
       type: data.type,
+      cardsDetails: data.cards_details ? (typeof data.cards_details === 'string' ? JSON.parse(data.cards_details) : data.cards_details) : undefined,
     };
   } catch (err) {
     console.error("Supabase addWholesale failed:", err);
@@ -1541,8 +1594,9 @@ export async function getAuctions(): Promise<AuctionItem[]> {
   if (!isSupabaseConfigured()) {
     const stored = localStorage.getItem('auctions_list');
     if (stored) return JSON.parse(stored);
-    localStorage.setItem('auctions_list', JSON.stringify([]));
-    return [];
+    const items = mockAuctionItems();
+    localStorage.setItem('auctions_list', JSON.stringify(items));
+    return items;
   }
 
   try {
@@ -1551,16 +1605,14 @@ export async function getAuctions(): Promise<AuctionItem[]> {
       .select('*');
 
     if (error) throw error;
-    if (!data || data.length === 0) {
-      return [];
-    }
+    const list = data || [];
 
-    return data.map(mapAuctionToTS);
+    return list.map(mapAuctionToTS);
   } catch (err) {
     console.error("Supabase getAuctions failed, using local:", err);
     const stored = localStorage.getItem('auctions_list');
     if (stored) return JSON.parse(stored);
-    return [];
+    return mockAuctionItems();
   }
 }
 
@@ -1936,6 +1988,7 @@ export async function getSystemSettings(): Promise<SystemSettings> {
       ltcAddress: data.ltc_address,
       ethAddress: data.eth_address || DEFAULT_SETTINGS.ethAddress,
       usdtAddress: data.usdt_address,
+      telegramUsername: data.telegram_username || DEFAULT_SETTINGS.telegramUsername,
     };
   } catch (err) {
     console.error("Supabase getSettings failed:", err);
@@ -1958,6 +2011,7 @@ export async function updateSystemSettings(settings: SystemSettings): Promise<vo
         ltc_address: settings.ltcAddress,
         eth_address: settings.ethAddress,
         usdt_address: settings.usdtAddress,
+        telegram_username: settings.telegramUsername,
       });
   } catch (err) {
     console.error("Supabase updateSettings failed:", err);

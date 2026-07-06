@@ -38,7 +38,8 @@ import {
   updateOrderTestStatus,
   getSystemSettings,
   updateSystemSettings,
-  SystemSettings
+  SystemSettings,
+  isSupabaseConfigured
 } from './utils/dbService';
 
 import AuthPage from './components/AuthPage';
@@ -98,6 +99,7 @@ export function MainDashboard({ user, setUser, onLogout }: {
     ltcAddress: 'LQP92mxC9G9888AsXgH66688hS7sdfsF',
     ethAddress: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
     usdtAddress: 'TR7NHqfe61L19L9fHX2989c56G7999jW53',
+    telegramUsername: '@protocolcc_bot',
   });
 
   // Search Filter form states
@@ -132,7 +134,14 @@ export function MainDashboard({ user, setUser, onLogout }: {
     // Newly added filter keys for screenshot layouts
     firstName: '',
     lastName: '',
-    ownRent: '',
+    ownRent: false,
+    yearsAtResidence: false,
+    incomeType: false,
+    employer: false,
+    occupation: false,
+    yearsEmployed: false,
+    workPhone: false,
+    netMonthlyIncome: false,
     dlState: '',
     accountNumber: false,
     routingNumber: false,
@@ -186,6 +195,9 @@ export function MainDashboard({ user, setUser, onLogout }: {
 
   // 1. Initial mounting fetch and refresh when login changes
   useEffect(() => {
+    if (isSupabaseConfigured() && !user) {
+      return;
+    }
     async function initDbFetch() {
       try {
         const settings = await getSystemSettings();
@@ -281,8 +293,56 @@ export function MainDashboard({ user, setUser, onLogout }: {
   };
 
   const handleAddFunds = async (amount: number) => {
-    const newBalance = user.balance + amount;
-    const newCrabs = user.crabRating + 15;
+    let newBalance = user.balance + amount;
+    let newCrabs = user.crabRating + 15;
+    let newStatus = user.accountStatus;
+    let activatedNow = false;
+
+    if (user.accountStatus === 'inactive' && amount >= 20) {
+      newBalance = user.balance + (amount - 20); // deduct $20 activation fee
+      newStatus = 'active';
+      newCrabs = user.crabRating + 40; // give more crabs for active status
+      activatedNow = true;
+    }
+
+    try {
+      await updateUserProfile(user.email, {
+        balance: newBalance,
+        crabRating: newCrabs,
+        accountStatus: newStatus
+      });
+      setUser(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          balance: newBalance,
+          crabRating: newCrabs,
+          accountStatus: newStatus
+        };
+      });
+      
+      if (activatedNow) {
+        addToast(`Success! Your account has been activated! Balance credited: +$${(amount - 20).toFixed(2)}`, 'success');
+      } else {
+        addToast(`Successfully credited +$${amount.toFixed(2)} to your live account!`, 'success');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleActivateAccount = async () => {
+    if (user.balance < 20) {
+      addToast(`Insufficient balance. Activation requires a $20.00 fee. Please top up.`, 'info');
+      setUser(prev => {
+        if (!prev) return null;
+        return { ...prev, addFundsOpen: true };
+      });
+      return;
+    }
+
+    const newBalance = user.balance - 20;
+    const newCrabs = user.crabRating + 25;
     const newStatus = 'active';
 
     try {
@@ -291,15 +351,19 @@ export function MainDashboard({ user, setUser, onLogout }: {
         crabRating: newCrabs,
         accountStatus: newStatus
       });
-      setUser(prev => ({
-        ...prev,
-        balance: newBalance,
-        crabRating: newCrabs,
-        accountStatus: newStatus
-      }));
-      addToast(`Successfully credited +$${amount.toFixed(2)} to your live account!`, 'success');
+      setUser(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          balance: newBalance,
+          crabRating: newCrabs,
+          accountStatus: newStatus
+        };
+      });
+      addToast(`Account successfully activated!`, 'success');
     } catch (err) {
-      console.error(err);
+      console.error("Failed to activate account:", err);
+      addToast(`Activation failed. Please try again.`, 'info');
     }
   };
 
@@ -339,6 +403,8 @@ export function MainDashboard({ user, setUser, onLogout }: {
       emailPassword: false,
       withoutCvv2: false,
       base: 'WHOLESALE_PACK',
+      packCount: pack.count,
+      cardsDetails: pack.cardsDetails,
     };
     setCart(prev => [...prev, mockCardPack]);
     addToast(`Added bulk pack: "${pack.name}" to cart.`, 'success');
@@ -346,6 +412,11 @@ export function MainDashboard({ user, setUser, onLogout }: {
 
   // Checkouts checkout items callback - Saves order to Firestore
   const handleCheckoutItems = async (items: any[], totalCost: number) => {
+    if (user.accountStatus === 'inactive') {
+      addToast('Purchase blocked. Your account is currently inactive. Please pay the $20.00 activation fee first.', 'info');
+      throw new Error('Your account is currently inactive. Please pay the $20.00 activation fee first.');
+    }
+
     const newBalance = user.balance - totalCost;
     const newCrabs = user.crabRating + items.length * 10;
 
@@ -553,7 +624,14 @@ export function MainDashboard({ user, setUser, onLogout }: {
       withoutCvv2: false,
       firstName: '',
       lastName: '',
-      ownRent: '',
+      ownRent: false,
+      yearsAtResidence: false,
+      incomeType: false,
+      employer: false,
+      occupation: false,
+      yearsEmployed: false,
+      workPhone: false,
+      netMonthlyIncome: false,
       dlState: '',
       accountNumber: false,
       routingNumber: false,
@@ -659,6 +737,14 @@ export function MainDashboard({ user, setUser, onLogout }: {
       if (searchFilters.firstName.trim() && (!card.fullName || !card.fullName.toLowerCase().includes(searchFilters.firstName.toLowerCase()))) return false;
       if (searchFilters.lastName.trim() && (!card.fullName || !card.fullName.toLowerCase().includes(searchFilters.lastName.toLowerCase()))) return false;
       if (searchFilters.dlState && card.state !== searchFilters.dlState) return false;
+      if (searchFilters.ownRent && !card.ownRent) return false;
+      if (searchFilters.yearsAtResidence && !card.yearsAtResidence) return false;
+      if (searchFilters.incomeType && !card.incomeType) return false;
+      if (searchFilters.employer && !card.employer) return false;
+      if (searchFilters.occupation && !card.occupation) return false;
+      if (searchFilters.yearsEmployed && !card.yearsEmployed) return false;
+      if (searchFilters.workPhone && !card.workPhone) return false;
+      if (searchFilters.netMonthlyIncome && !card.netMonthlyIncome) return false;
 
       // Dumps specific matches
       if (searchFilters.bins8Digit.trim()) {
@@ -691,23 +777,36 @@ export function MainDashboard({ user, setUser, onLogout }: {
 
         {/* Account Inactive Alert Banner */}
         {user.accountStatus === 'inactive' && (
-          <div className="bg-[#bee5eb] border border-[#bee5eb] text-[#0c5460] px-4 py-3.5 rounded-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shadow-xs">
+          <div className="bg-[#bee5eb] border border-[#bee5eb] text-[#0c5460] px-4 py-3.5 rounded-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shadow-xs animate-pulse">
             <div className="flex items-start gap-2.5 text-xs">
               <AlertCircle className="w-5 h-5 shrink-0 text-[#0c5460]" />
               <div>
-                <p className="font-bold leading-relaxed text-gray-950 text-[11px] uppercase tracking-wider">Your account is inactive.</p>
+                <p className="font-bold leading-relaxed text-gray-950 text-[11px] uppercase tracking-wider">Your account is currently inactive.</p>
                 <p className="font-semibold text-gray-700 leading-relaxed mt-0.5">
-                  For activation you need to top up your balance. Attention: Not activated accounts for more than 5 days will be deleted automatically.
+                  An activation fee of $20.00 is required. To activate your account, you must make a deposit of <span className="font-extrabold text-gray-950 underline">$20.00 or more</span>. Your account will be activated instantly upon deposit. Current Balance: ${user.balance.toFixed(2)}.
                 </p>
               </div>
             </div>
             
-            <button
-              onClick={() => setUser(prev => ({ ...prev, addFundsOpen: true }))}
-              className="bg-white/80 hover:bg-white text-[#0c5460] border border-[#0c5460] font-black uppercase text-[10px] px-4 py-2.5 rounded transition-all shadow-xs cursor-pointer tracking-wider"
-            >
-              Activate Now (Top up)
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setUser(prev => {
+                  if (!prev) return null;
+                  return { ...prev, addFundsOpen: true };
+                })}
+                className="bg-[#0c5460] hover:bg-[#073a43] text-white font-black uppercase text-[10px] px-4 py-2.5 rounded transition-all shadow-md cursor-pointer tracking-wider whitespace-nowrap"
+              >
+                Deposit $20+ to Activate
+              </button>
+              {user.balance >= 20 && (
+                <button
+                  onClick={handleActivateAccount}
+                  className="bg-white/90 hover:bg-white text-[#0c5460] border border-[#0c5460] font-black uppercase text-[10px] px-4 py-2.5 rounded transition-all shadow-xs cursor-pointer tracking-wider whitespace-nowrap"
+                >
+                  Activate using Balance ($20.00)
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -972,12 +1071,14 @@ export function MainDashboard({ user, setUser, onLogout }: {
                 setSearchFilters={setSearchFilters}
                 onSearch={() => addToast('Search filters updated.', 'success')}
                 onReset={handleResetFilters}
+                cardList={cardList}
               />
               <CardTable
                 cards={processedCards}
                 cart={cart}
                 onAddToCart={handleAddToCart}
                 activeTab={activeTab}
+                accountStatus={user.accountStatus}
               />
             </div>
           )}
@@ -1026,6 +1127,7 @@ export function MainDashboard({ user, setUser, onLogout }: {
               setIsTyping={setIsTyping}
               onCreateTicket={handleCreateTicketSubmit}
               onSendMessage={handleSendMessageSubmit}
+              telegramUsername={paymentAddresses.telegramUsername}
             />
           )}
 
@@ -1219,7 +1321,7 @@ export function MainDashboard({ user, setUser, onLogout }: {
   );
 }
 
-// ---------------- Clerk SSO & Custom Fallback Wrappers ----------------
+// ---------------- Session Restore & Custom Fallback Wrappers ----------------
 
 export default function App() {
   const [user, setUser] = useState<(UserProfile & { role: 'admin' | 'customer' }) | null>(null);

@@ -8,10 +8,36 @@ interface FilterFormProps {
   setSearchFilters: React.Dispatch<React.SetStateAction<any>>;
   onSearch: () => void;
   onReset: () => void;
+  cardList?: any[];
 }
 
-export default function FilterForm({ activeTab, searchFilters, setSearchFilters, onSearch, onReset }: FilterFormProps) {
+export default function FilterForm({ activeTab, searchFilters, setSearchFilters, onSearch, onReset, cardList }: FilterFormProps) {
   const [liveFiltering, setLiveFiltering] = useState(false);
+
+  // Dynamically extract unique banks, countries, states, and bases from cardList if provided
+  const dynamicBanks = cardList 
+    ? Array.from(new Set(cardList.filter(c => c.category === activeTab || (!c.category && activeTab === 'cvv2')).map(c => c.bank).filter(Boolean))) as string[]
+    : [];
+  const dynamicBases = cardList
+    ? Array.from(new Set(cardList.filter(c => c.category === activeTab || (!c.category && activeTab === 'cvv2')).map(c => c.base).filter(Boolean))) as string[]
+    : [];
+  const dynamicCountries = cardList
+    ? Array.from(new Set(cardList.filter(c => c.category === activeTab || (!c.category && activeTab === 'cvv2')).map(c => c.country).filter(Boolean))) as string[]
+    : [];
+  const dynamicStates = cardList
+    ? Array.from(new Set(cardList.filter(c => c.category === activeTab || (!c.category && activeTab === 'cvv2')).map(c => c.state).filter(Boolean))) as string[]
+    : [];
+
+  const banksList = Array.from(new Set([...dynamicBanks, ...mockBanks])).sort();
+  const basesList = Array.from(new Set([...dynamicBases, ...mockBases])).sort();
+  const statesList = Array.from(new Set([...dynamicStates, ...mockStates])).sort();
+
+  const countriesList = [...mockCountries];
+  dynamicCountries.forEach(code => {
+    if (!countriesList.some(c => c.code.toUpperCase() === code.toUpperCase())) {
+      countriesList.push({ code: code.toUpperCase(), name: code.toUpperCase() });
+    }
+  });
 
   const handleInputChange = (field: string, value: any) => {
     setSearchFilters((prev: any) => ({ ...prev, [field]: value }));
@@ -58,22 +84,82 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
                 className="w-full border border-gray-300 rounded-sm p-1.5 bg-white text-xs text-gray-700 focus:outline-none focus:border-blue-500"
               >
                 <option value="">- all -</option>
-                {mockStates.map(s => (
+                {statesList.map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
             </FormRow>
 
             <FormRow label="Own / Rent">
-              <select
-                value={searchFilters.ownRent || ''}
-                onChange={e => handleInputChange('ownRent', e.target.value)}
-                className="w-full border border-gray-300 rounded-sm p-1.5 bg-white text-xs text-gray-700 focus:outline-none focus:border-blue-500"
-              >
-                <option value="">- all -</option>
-                <option value="Own">Own</option>
-                <option value="Rent">Rent</option>
-              </select>
+              <input
+                type="checkbox"
+                checked={searchFilters.ownRent}
+                onChange={e => handleInputChange('ownRent', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+              />
+            </FormRow>
+
+            <FormRow label="Years At Residence">
+              <input
+                type="checkbox"
+                checked={searchFilters.yearsAtResidence}
+                onChange={e => handleInputChange('yearsAtResidence', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+              />
+            </FormRow>
+
+            <FormRow label="Income Type">
+              <input
+                type="checkbox"
+                checked={searchFilters.incomeType}
+                onChange={e => handleInputChange('incomeType', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+              />
+            </FormRow>
+
+            <FormRow label="Employer">
+              <input
+                type="checkbox"
+                checked={searchFilters.employer}
+                onChange={e => handleInputChange('employer', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+              />
+            </FormRow>
+
+            <FormRow label="Occupation">
+              <input
+                type="checkbox"
+                checked={searchFilters.occupation}
+                onChange={e => handleInputChange('occupation', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+              />
+            </FormRow>
+
+            <FormRow label="Years Employed">
+              <input
+                type="checkbox"
+                checked={searchFilters.yearsEmployed}
+                onChange={e => handleInputChange('yearsEmployed', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+              />
+            </FormRow>
+
+            <FormRow label="Work Phone">
+              <input
+                type="checkbox"
+                checked={searchFilters.workPhone}
+                onChange={e => handleInputChange('workPhone', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+              />
+            </FormRow>
+
+            <FormRow label="Net Monthly Income">
+              <input
+                type="checkbox"
+                checked={searchFilters.netMonthlyIncome}
+                onChange={e => handleInputChange('netMonthlyIncome', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+              />
             </FormRow>
 
             <FormRow label="Phone">
@@ -140,7 +226,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
                 className="w-full border border-gray-300 rounded-sm p-1.5 bg-white text-xs text-gray-700 focus:outline-none focus:border-blue-500"
               >
                 <option value="">- all -</option>
-                {mockStates.map(s => (
+                {statesList.map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
@@ -174,7 +260,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
                 className="w-full border border-gray-300 rounded-sm p-1.5 bg-white text-xs text-gray-700 focus:outline-none focus:border-blue-500"
               >
                 <option value="">- all -</option>
-                {mockBases.map(b => (
+                {basesList.map(b => (
                   <option key={b} value={b}>{b}</option>
                 ))}
               </select>
@@ -187,7 +273,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
                 className="w-full border border-gray-300 rounded-sm p-1.5 bg-white text-xs text-gray-700 focus:outline-none focus:border-blue-500"
               >
                 <option value="">- all -</option>
-                {mockCountries.map(c => (
+                {countriesList.map(c => (
                   <option key={c.code} value={c.code}>{c.name}</option>
                 ))}
               </select>
@@ -265,7 +351,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
                 className="w-full border border-gray-300 rounded-sm p-1.5 bg-white focus:outline-none focus:border-blue-400 text-xs text-gray-700"
               >
                 <option value="">- all -</option>
-                {mockBanks.map(b => (
+                {banksList.map(b => (
                   <option key={b} value={b}>{b}</option>
                 ))}
               </select>
@@ -281,7 +367,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
                 className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px] text-gray-700 focus:outline-none focus:border-blue-500"
               >
                 <option value="">- all -</option>
-                {mockCountries.map(c => (
+                {countriesList.map(c => (
                   <option key={c.code} value={c.code}>{c.name}</option>
                 ))}
               </select>
@@ -294,7 +380,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
                 className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px] text-gray-700 focus:outline-none focus:border-blue-500"
               >
                 <option value="">- all -</option>
-                {mockStates.map(s => (
+                {statesList.map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
@@ -446,98 +532,17 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
 
           {/* Column 4 */}
           <div className="border border-gray-200 rounded-sm bg-white overflow-hidden h-fit">
-            <FormRow label="Base">
+            <FormRow label="Base" border={false}>
               <select
                 value={searchFilters.base}
                 onChange={e => handleInputChange('base', e.target.value)}
                 className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px] text-gray-700 focus:outline-none focus:border-blue-500"
               >
                 <option value="">- all -</option>
-                {mockBases.map(b => (
+                {basesList.map(b => (
                   <option key={b} value={b}>{b}</option>
                 ))}
               </select>
-            </FormRow>
-
-            <FormRow label="DOB">
-              <input
-                type="checkbox"
-                checked={searchFilters.dob}
-                onChange={e => handleInputChange('dob', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-              />
-            </FormRow>
-
-            <FormRow label="SSN">
-              <input
-                type="checkbox"
-                checked={searchFilters.ssn}
-                onChange={e => handleInputChange('ssn', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-              />
-            </FormRow>
-
-            <FormRow label="MMN">
-              <input
-                type="checkbox"
-                checked={searchFilters.mmn}
-                onChange={e => handleInputChange('mmn', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-              />
-            </FormRow>
-
-            <FormRow label="IP address">
-              <input
-                type="checkbox"
-                checked={searchFilters.ipAddress}
-                onChange={e => handleInputChange('ipAddress', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-              />
-            </FormRow>
-
-            <FormRow label="Last Paid Amount">
-              <input
-                type="checkbox"
-                checked={searchFilters.lastPaidAmount}
-                onChange={e => handleInputChange('lastPaidAmount', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-              />
-            </FormRow>
-
-            <FormRow label="DL Number">
-              <input
-                type="checkbox"
-                checked={searchFilters.driverLicense}
-                onChange={e => handleInputChange('driverLicense', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-              />
-            </FormRow>
-
-            <FormRow label="DL Scan">
-              <input
-                type="checkbox"
-                checked={searchFilters.driverLicenseScan}
-                onChange={e => handleInputChange('driverLicenseScan', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-              />
-            </FormRow>
-
-            <FormRow label="ATM PIN">
-              <input
-                type="checkbox"
-                checked={searchFilters.atmPin}
-                onChange={e => handleInputChange('atmPin', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-              />
-            </FormRow>
-
-            <FormRow label="AT&T PIN" border={false}>
-              <input
-                type="checkbox"
-                checked={searchFilters.attPin}
-                onChange={e => handleInputChange('attPin', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-              />
             </FormRow>
           </div>
 
@@ -585,7 +590,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
               className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px]"
             >
               <option value="">- any -</option>
-              {mockBanks.map(b => (
+              {banksList.map(b => (
                 <option key={b} value={b}>{b}</option>
               ))}
             </select>
@@ -598,7 +603,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
               className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px]"
             >
               <option value="">- any -</option>
-              {mockCountries.map(c => (
+              {countriesList.map(c => (
                 <option key={c.code} value={c.code}>{c.name}</option>
               ))}
             </select>
@@ -611,7 +616,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
               className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px]"
             >
               <option value="">- any -</option>
-              {mockStates.map(s => (
+              {statesList.map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -933,7 +938,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
               className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px]"
             >
               <option value="">- all -</option>
-              {mockBanks.map(b => (
+              {banksList.map(b => (
                 <option key={b} value={b}>{b}</option>
               ))}
             </select>
@@ -947,7 +952,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
               className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px]"
             >
               <option value="">- all -</option>
-              {mockCountries.map(c => (
+              {countriesList.map(c => (
                 <option key={c.code} value={c.code}>{c.name}</option>
               ))}
             </select>
@@ -978,7 +983,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
               className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px]"
             >
               <option value="">- all -</option>
-              {mockCountries.map(c => (
+              {countriesList.map(c => (
                 <option key={c.code} value={c.code}>{c.name}</option>
               ))}
             </select>
@@ -992,7 +997,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
               className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px]"
             >
               <option value="">- all -</option>
-              {mockStates.map(s => (
+              {statesList.map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -1092,7 +1097,7 @@ export default function FilterForm({ activeTab, searchFilters, setSearchFilters,
               className="w-full border border-gray-300 rounded-sm p-1 bg-white text-[11px] text-gray-700"
             >
               <option value="">- all -</option>
-              {mockBases.map(b => (
+              {basesList.map(b => (
                 <option key={b} value={b}>{b}</option>
               ))}
             </select>

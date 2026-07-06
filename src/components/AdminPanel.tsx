@@ -100,7 +100,7 @@ export default function AdminPanel({
 
   // Bulk input text state
   const [bulkText, setBulkText] = useState('');
-  const [bulkCategory, setBulkCategory] = useState<'cvv2' | 'dumps' | 'fullz'>('cvv2');
+  const [bulkCategory, setBulkCategory] = useState<'cvv2' | 'dumps' | 'fullz' | 'banklogs' | 'cashapp' | 'paypal' | 'rdp'>('cvv2');
   const [bulkPrice, setBulkPrice] = useState<number>(12.00);
   const [bulkBase, setBulkBase] = useState('BASE_BULK_AUTO_PROTOCOL');
 
@@ -110,6 +110,7 @@ export default function AdminPanel({
     ltcAddress: systemSettings.ltcAddress,
     ethAddress: systemSettings.ethAddress,
     usdtAddress: systemSettings.usdtAddress || '',
+    telegramUsername: systemSettings.telegramUsername || '@protocolcc_bot',
   });
 
   const [loading, setLoading] = useState(false);
@@ -122,10 +123,23 @@ export default function AdminPanel({
   // Wholesale Form State
   const [wholesaleName, setWholesaleName] = useState('');
   const [wholesaleCount, setWholesaleCount] = useState(10);
+  const [wholesaleCardInputs, setWholesaleCardInputs] = useState<string[]>(() => Array(10).fill(''));
   const [wholesalePrice, setWholesalePrice] = useState(120.00);
   const [wholesaleDescription, setWholesaleDescription] = useState('Premium high validity CC combo pack.');
   const [wholesaleCountry, setWholesaleCountry] = useState('US');
   const [wholesaleType, setWholesaleType] = useState('Visa Platinum / Gold');
+
+  const handleWholesaleCountChange = (val: number) => {
+    setWholesaleCount(val);
+    setWholesaleCardInputs(prev => {
+      const copy = [...prev];
+      if (val > copy.length) {
+        return [...copy, ...Array(val - copy.length).fill('')];
+      } else {
+        return copy.slice(0, val);
+      }
+    });
+  };
 
   // Auction Form State
   const [auctionBin, setAuctionBin] = useState('411111');
@@ -135,11 +149,25 @@ export default function AdminPanel({
   const [auctionExpDate, setAuctionExpDate] = useState('12/28');
   const [auctionType, setAuctionType] = useState<'Visa' | 'Mastercard' | 'Amex' | 'Discover'>('Visa');
   const [auctionStartingBid, setAuctionStartingBid] = useState(30.00);
+  const [auctionCardsCount, setAuctionCardsCount] = useState(1);
+  const [auctionCardsDetails, setAuctionCardsDetails] = useState<string[]>(() => Array(1).fill(''));
   const [auctionEndTime, setAuctionEndTime] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().substring(0, 16);
   });
+
+  const handleAuctionCardsCountChange = (val: number) => {
+    setAuctionCardsCount(val);
+    setAuctionCardsDetails(prev => {
+      const copy = [...prev];
+      if (val > copy.length) {
+        return [...copy, ...Array(val - copy.length).fill('')];
+      } else {
+        return copy.slice(0, val);
+      }
+    });
+  };
 
   // Admin fetched lists (Support Tickets, Payments Tracking)
   const [ticketsList, setTicketsList] = useState<SupportTicket[]>([]);
@@ -245,6 +273,40 @@ export default function AdminPanel({
                     <div className="flex flex-col gap-1">
                       <label className="font-bold">State</label>
                       <input type="text" value={item.state || ''} onChange={e => setEditingItem({ ...editingItem, item: { ...item, state: e.target.value } })} className="border p-1.5 rounded" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Card brand / Type</label>
+                      <select
+                        value={item.type || 'Visa'}
+                        onChange={e => setEditingItem({ ...editingItem, item: { ...item, type: e.target.value as any } })}
+                        className="border p-1.5 rounded bg-white font-semibold"
+                      >
+                        <option value="Visa">Visa</option>
+                        <option value="Mastercard">Mastercard</option>
+                        <option value="Amex">American Express</option>
+                        <option value="Discover">Discover</option>
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-bold">Credit / Debit</label>
+                      <select
+                        value={item.creditDebit || 'Credit'}
+                        onChange={e => setEditingItem({ ...editingItem, item: { ...item, creditDebit: e.target.value as any } })}
+                        className="border p-1.5 rounded bg-white font-semibold"
+                      >
+                        <option value="Credit">Credit</option>
+                        <option value="Debit">Debit</option>
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1 col-span-2">
+                      <label className="font-bold">Subtype</label>
+                      <input
+                        type="text"
+                        value={item.subtype || ''}
+                        onChange={e => setEditingItem({ ...editingItem, item: { ...item, subtype: e.target.value } })}
+                        className="border p-1.5 rounded"
+                        placeholder="e.g. Platinum, Classic, etc."
+                      />
                     </div>
                     <div className="flex flex-col gap-1 col-span-2">
                       <label className="font-bold">Price ($)</label>
@@ -461,6 +523,7 @@ export default function AdminPanel({
                     ) : (
                       <>
                         <th className="p-2">BIN</th>
+                        <th className="p-2">Type</th>
                         <th className="p-2">Bank</th>
                         <th className="p-2">Country/State</th>
                         <th className="p-2">Price</th>
@@ -503,6 +566,16 @@ export default function AdminPanel({
                       ) : (
                         <>
                           <td className="p-2 font-mono font-bold text-blue-700">{c.bin}</td>
+                          <td className="p-2">
+                            <span className={`px-1 py-0.5 rounded-[2px] font-extrabold text-[9px] uppercase tracking-wide ${
+                              c.type === 'Visa' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                              c.type === 'Mastercard' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
+                              c.type === 'Amex' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                              'bg-zinc-100 text-zinc-800 border border-zinc-200'
+                            }`}>
+                              {(c.type || 'Visa').toUpperCase()}
+                            </span>
+                          </td>
                           <td className="p-2 text-gray-800">{c.bank}</td>
                           <td className="p-2 font-mono text-gray-600">{c.country} / {c.state}</td>
                           <td className="p-2 font-mono font-bold text-emerald-700">${c.price}</td>
@@ -685,14 +758,12 @@ export default function AdminPanel({
         cardData.ssn = false;
         cardData.dob = false;
       } else if (category === 'fullz') {
-        if (!singleCard.bin || !singleCard.bank || !singleCard.price) {
-          alert('Please fill out all required fields (BIN, Bank Name, Price).');
+        if (!singleCard.bank || !singleCard.price) {
+          alert('Please fill out all required fields (Bank Name, Price).');
           setLoading(false);
           return;
         }
         cardData.withoutCvv2 = false;
-        cardData.ssn = true;
-        cardData.dob = true;
       } else if (category === 'banklogs') {
         if (!singleCard.bank || !singleCard.price || singleCard.bankBalance === undefined) {
           alert('Please fill out all required fields (Bank Name, Balance, Price).');
@@ -810,11 +881,13 @@ export default function AdminPanel({
         description: wholesaleDescription,
         country: wholesaleCountry,
         type: wholesaleType,
+        cardsDetails: wholesaleCardInputs.slice(0, wholesaleCount),
       });
       setWholesaleList(prev => [newPack, ...prev]);
       onAddToast(`Wholesale pack "${wholesaleName}" listed successfully!`, 'success');
       setWholesaleName('');
       setWholesaleCount(10);
+      setWholesaleCardInputs(Array(10).fill(''));
       setWholesalePrice(120.00);
       setWholesaleDescription('Premium high validity CC combo pack.');
     } catch (err) {
@@ -868,15 +941,22 @@ export default function AdminPanel({
       const newAuction = await addAuctionItem({
         card: cardDetail,
         currentBid: auctionStartingBid,
+        startingBid: auctionStartingBid,
         myBid: 0,
         bidsCount: 0,
         endTime: auctionEndTime,
+        cardsCount: auctionCardsCount,
+        cardsDetails: auctionCardsDetails.slice(0, auctionCardsCount),
+        biddersList: [],
+        ended: false,
       });
       setAuctions(prev => [newAuction, ...prev]);
       onAddToast(`Auction for card ${auctionBin} launched successfully!`, 'success');
       setAuctionBin('411111');
       setAuctionBank('WELLS FARGO');
       setAuctionStartingBid(30.00);
+      setAuctionCardsCount(1);
+      setAuctionCardsDetails(Array(1).fill(''));
     } catch (err) {
       console.error(err);
       alert('Error creating auction.');
@@ -988,44 +1068,347 @@ export default function AdminPanel({
         const parts = line.split(/[|,]/).map(p => p.trim());
         if (parts.length === 0) continue;
 
-        // Parse with defaults
-        const bin = parts[0] || '400000';
-        const zip = parts[1] || '10001';
-        const bank = parts[2] || 'STANDARD BANK';
-        const country = parts[3] || 'US';
-        const state = parts[4] || 'NY';
-        const expDate = parts[5] || '12/28';
+        if (bulkCategory === 'banklogs') {
+          const bank = parts[0] || 'CHASE BANK';
+          const country = parts[1] || 'US';
+          const state = parts[2] || 'NY';
+          const bankAccountType = parts[3] || 'Checking';
+          const bankBalance = parseFloat(parts[4]) || 500.00;
+          const bankAccessType = parts[5] || 'Online Login';
+          const loginUsername = parts[6] || 'chase_user';
+          const loginPassword = parts[7] || 'password123';
 
-        cardsToUpload.push({
-          bin,
-          zip,
-          bank: bank.toUpperCase(),
-          country: country.toUpperCase(),
-          state: state.toUpperCase(),
-          type: bulkCategory === 'dumps' ? 'Mastercard' : 'Visa',
-          creditDebit: 'Credit',
-          subtype: 'Platinum',
-          expDate,
-          discounted: false,
-          onlyRefundable: bulkCategory === 'cvv2',
-          price: bulkPrice,
-          ssn: bulkCategory === 'fullz',
-          dob: bulkCategory === 'fullz',
-          mmn: false,
-          ipAddress: '127.0.0.1',
-          lastPaidAmount: false,
-          driverLicense: false,
-          driverLicenseScan: false,
-          atmPin: false,
-          attPin: false,
-          fullAddress: true,
-          phone: true,
-          email: true,
-          emailPassword: false,
-          withoutCvv2: bulkCategory === 'dumps',
-          base: bulkBase,
-          category: bulkCategory,
-        });
+          cardsToUpload.push({
+            category: 'banklogs',
+            bank: bank.toUpperCase(),
+            country: country.toUpperCase(),
+            state: state.toUpperCase(),
+            bankAccountType,
+            bankBalance,
+            bankAccessType,
+            loginUsername,
+            loginPassword,
+            price: bulkPrice,
+            base: bulkBase,
+            bin: 'BANKLOG',
+            zip: 'MIXED',
+            type: 'Visa',
+            creditDebit: 'Credit',
+            subtype: 'Platinum',
+            expDate: '12/28',
+            discounted: false,
+            onlyRefundable: false,
+            ssn: false,
+            dob: false,
+            mmn: false,
+            ipAddress: '127.0.0.1',
+            lastPaidAmount: false,
+            driverLicense: false,
+            driverLicenseScan: false,
+            atmPin: false,
+            attPin: false,
+            fullAddress: true,
+            phone: true,
+            email: true,
+            emailPassword: false,
+            withoutCvv2: false,
+          });
+        } else if (bulkCategory === 'cashapp') {
+          const cashappUsername = parts[0] || '$cashtag';
+          const cashappBalance = parseFloat(parts[1]) || 150.00;
+          const loginUsername = parts[2] || 'cash_user';
+          const loginPassword = parts[3] || 'password123';
+          const cashappEmail = parts[4] || 'cash@example.com';
+          const cashappPhone = parts[5] || '+15550199';
+          const cashappPin = parts[6] || '1234';
+
+          cardsToUpload.push({
+            category: 'cashapp',
+            cashappUsername,
+            cashappBalance,
+            cashappHasFunds: cashappBalance > 0,
+            loginUsername,
+            loginPassword,
+            cashappEmail,
+            cashappPhone,
+            cashappPin,
+            price: bulkPrice,
+            base: bulkBase,
+            bin: 'CASHAPP',
+            zip: 'MIXED',
+            bank: 'CASHAPP BANK',
+            country: 'US',
+            state: 'MIX',
+            type: 'Visa',
+            creditDebit: 'Credit',
+            subtype: 'Platinum',
+            expDate: '12/28',
+            discounted: false,
+            onlyRefundable: false,
+            ssn: false,
+            dob: false,
+            mmn: false,
+            ipAddress: '127.0.0.1',
+            lastPaidAmount: false,
+            driverLicense: false,
+            driverLicenseScan: false,
+            atmPin: false,
+            attPin: false,
+            fullAddress: true,
+            phone: true,
+            email: true,
+            emailPassword: false,
+            withoutCvv2: false,
+          });
+        } else if (bulkCategory === 'paypal') {
+          const paypalEmail = parts[0] || 'paypal@example.com';
+          const paypalPassword = parts[1] || 'password123';
+          const paypalBalance = parseFloat(parts[2]) || 250.00;
+          const paypalCookies = parts[3] || 'CookieSessionData';
+
+          cardsToUpload.push({
+            category: 'paypal',
+            paypalEmail,
+            paypalPassword,
+            paypalBalance,
+            paypalHasPaymentMethod: true,
+            paypalCookies,
+            price: bulkPrice,
+            base: bulkBase,
+            bin: 'PAYPAL',
+            zip: 'MIXED',
+            bank: 'PAYPAL BANK',
+            country: 'US',
+            state: 'MIX',
+            type: 'Visa',
+            creditDebit: 'Credit',
+            subtype: 'Platinum',
+            expDate: '12/28',
+            discounted: false,
+            onlyRefundable: false,
+            ssn: false,
+            dob: false,
+            mmn: false,
+            ipAddress: '127.0.0.1',
+            lastPaidAmount: false,
+            driverLicense: false,
+            driverLicenseScan: false,
+            atmPin: false,
+            attPin: false,
+            fullAddress: true,
+            phone: true,
+            email: true,
+            emailPassword: false,
+            withoutCvv2: false,
+          });
+        } else if (bulkCategory === 'rdp') {
+          const rdpIp = parts[0] || '192.168.1.1';
+          const rdpCity = parts[1] || 'New York';
+          const rdpOs = parts[2] || 'Windows Server 2022';
+          const rdpAccessType = parts[3] || 'Admin';
+          const rdpUsername = parts[4] || 'Administrator';
+          const rdpPassword = parts[5] || 'password123';
+
+          cardsToUpload.push({
+            category: 'rdp',
+            rdpIp,
+            rdpCity,
+            rdpOs,
+            rdpAccessType,
+            rdpUsername,
+            rdpPassword,
+            price: bulkPrice,
+            base: bulkBase,
+            bin: 'RDP_SERVER',
+            zip: 'MIXED',
+            bank: 'RDP HOST',
+            country: 'US',
+            state: 'NY',
+            type: 'Visa',
+            creditDebit: 'Credit',
+            subtype: 'Platinum',
+            expDate: '12/28',
+            discounted: false,
+            onlyRefundable: false,
+            ssn: false,
+            dob: false,
+            mmn: false,
+            ipAddress: rdpIp,
+            lastPaidAmount: false,
+            driverLicense: false,
+            driverLicenseScan: false,
+            atmPin: false,
+            attPin: false,
+            fullAddress: true,
+            phone: true,
+            email: true,
+            emailPassword: false,
+            withoutCvv2: false,
+          });
+        } else if (bulkCategory === 'cvv2') {
+          const cardNumber = parts[0] || '4000111122223333';
+          const expDate = parts[1] || '12/28';
+          const cvv = parts[2] || '123';
+          const fullName = parts[3] || 'JOHN DOE';
+          const zip = parts[4] || '10001';
+          const bank = parts[5] || 'STANDARD BANK';
+          const country = parts[6] || 'US';
+          const state = parts[7] || 'NY';
+          const bin = cardNumber.replace(/\D/g, '').slice(0, 6) || '400011';
+
+          cardsToUpload.push({
+            category: 'cvv2',
+            cardNumber,
+            expDate,
+            cvv,
+            fullName,
+            zip,
+            bank: bank.toUpperCase(),
+            country: country.toUpperCase(),
+            state: state.toUpperCase(),
+            bin,
+            type: (() => {
+              const cleanBin = bin.replace(/\D/g, '');
+              if (cleanBin.startsWith('4')) return 'Visa';
+              if (cleanBin.startsWith('5')) return 'Mastercard';
+              if (cleanBin.startsWith('3')) return 'Amex';
+              if (cleanBin.startsWith('6')) return 'Discover';
+              return 'Visa';
+            })(),
+            creditDebit: 'Credit',
+            subtype: 'Platinum',
+            price: bulkPrice,
+            base: bulkBase,
+            discounted: false,
+            onlyRefundable: true,
+            ssn: false,
+            dob: false,
+            mmn: false,
+            ipAddress: '127.0.0.1',
+            lastPaidAmount: false,
+            driverLicense: false,
+            driverLicenseScan: false,
+            atmPin: false,
+            attPin: false,
+            fullAddress: true,
+            phone: true,
+            email: true,
+            emailPassword: false,
+            withoutCvv2: false,
+          });
+        } else if (bulkCategory === 'dumps') {
+          const track2 = parts[0] || '4111111111111111=281210100000';
+          const cardNumber = parts[1] || track2.split('=')[0] || '4111111111111111';
+          const expDate = parts[2] || '12/28';
+          const zip = parts[3] || '10001';
+          const bank = parts[4] || 'STANDARD BANK';
+          const country = parts[5] || 'US';
+          const state = parts[6] || 'NY';
+          const track1 = parts[7] || '';
+          const bin = cardNumber.replace(/\D/g, '').slice(0, 6) || '411111';
+
+          cardsToUpload.push({
+            category: 'dumps',
+            track2,
+            cardNumber,
+            expDate,
+            zip,
+            bank: bank.toUpperCase(),
+            country: country.toUpperCase(),
+            state: state.toUpperCase(),
+            track1,
+            bin,
+            type: (() => {
+              const cleanBin = bin.replace(/\D/g, '');
+              if (cleanBin.startsWith('4')) return 'Visa';
+              if (cleanBin.startsWith('5')) return 'Mastercard';
+              if (cleanBin.startsWith('3')) return 'Amex';
+              if (cleanBin.startsWith('6')) return 'Discover';
+              return 'Visa';
+            })(),
+            creditDebit: 'Credit',
+            subtype: 'Platinum',
+            price: bulkPrice,
+            base: bulkBase,
+            discounted: false,
+            onlyRefundable: false,
+            ssn: false,
+            dob: false,
+            mmn: false,
+            ipAddress: '127.0.0.1',
+            lastPaidAmount: false,
+            driverLicense: false,
+            driverLicenseScan: false,
+            atmPin: false,
+            attPin: false,
+            fullAddress: true,
+            phone: true,
+            email: true,
+            emailPassword: false,
+            withoutCvv2: true,
+          });
+        } else if (bulkCategory === 'fullz') {
+          const cardNumber = parts[0] || '4000111122223333';
+          const expDate = parts[1] || '12/28';
+          const cvv = parts[2] || '123';
+          const fullName = parts[3] || 'JOHN DOE';
+          const fullSsn = parts[4] || '000-00-0000';
+          const fullDob = parts[5] || '01/01/1990';
+          const fullAddressStr = parts[6] || '123 MAIN ST';
+          const fullPhone = parts[7] || '+15550199';
+          const fullEmail = parts[8] || 'user@example.com';
+          const zip = parts[9] || '10001';
+          const bank = parts[10] || 'STANDARD BANK';
+          const country = parts[11] || 'US';
+          const state = parts[12] || 'NY';
+          const bin = cardNumber.replace(/\D/g, '').slice(0, 6) || '400011';
+
+          cardsToUpload.push({
+            category: 'fullz',
+            cardNumber,
+            expDate,
+            cvv,
+            fullName,
+            fullSsn,
+            fullDob,
+            fullAddressStr,
+            fullPhone,
+            fullEmail,
+            zip,
+            bank: bank.toUpperCase(),
+            country: country.toUpperCase(),
+            state: state.toUpperCase(),
+            bin,
+            type: (() => {
+              const cleanBin = bin.replace(/\D/g, '');
+              if (cleanBin.startsWith('4')) return 'Visa';
+              if (cleanBin.startsWith('5')) return 'Mastercard';
+              if (cleanBin.startsWith('3')) return 'Amex';
+              if (cleanBin.startsWith('6')) return 'Discover';
+              return 'Visa';
+            })(),
+            creditDebit: 'Credit',
+            subtype: 'Platinum',
+            price: bulkPrice,
+            base: bulkBase,
+            discounted: false,
+            onlyRefundable: false,
+            ssn: true,
+            dob: true,
+            mmn: false,
+            ipAddress: '127.0.0.1',
+            lastPaidAmount: false,
+            driverLicense: false,
+            driverLicenseScan: false,
+            atmPin: false,
+            attPin: false,
+            fullAddress: true,
+            phone: true,
+            email: true,
+            emailPassword: false,
+            withoutCvv2: false,
+          });
+        }
       }
 
       if (cardsToUpload.length === 0) {
@@ -1218,13 +1601,13 @@ export default function AdminPanel({
         </button>
         <button
           onClick={() => setAdminTab('addresses')}
-          className={`px-3 py-2 text-xs font-bold border-t border-x rounded-t cursor-pointer transition-all ${
+          className={`px-3 py-2 text-xs font-bold border-t border-x rounded-t cursor-pointer transition-all flex items-center gap-1 ${
             adminTab === 'addresses'
               ? 'bg-white border-gray-300 text-gray-900 border-b-white z-10 -mb-[1px]'
               : 'bg-gray-50 border-transparent text-gray-500 hover:text-gray-800'
           }`}
         >
-          Crypto Setting
+          <Send className="w-3.5 h-3.5 text-sky-600" /> Telegram Username
         </button>
       </div>
 
@@ -1248,10 +1631,21 @@ export default function AdminPanel({
                 const cleanVal = e.target.value.replace(/\D/g, '');
                 const formatted = cleanVal.replace(/(\d{4})/g, '$1 ').trim();
                 const first6 = cleanVal.slice(0, 6);
+                let detectedType: 'Visa' | 'Mastercard' | 'Amex' | 'Discover' | null = null;
+                if (cleanVal.startsWith('4')) {
+                  detectedType = 'Visa';
+                } else if (cleanVal.startsWith('5') || /^2(22[1-9]|2[3-9]\d|[3-6]\d{2}|7[0-1]\d|720)/.test(cleanVal)) {
+                  detectedType = 'Mastercard';
+                } else if (cleanVal.startsWith('34') || cleanVal.startsWith('37')) {
+                  detectedType = 'Amex';
+                } else if (cleanVal.startsWith('6')) {
+                  detectedType = 'Discover';
+                }
                 setSingleCard(prev => ({
                   ...prev,
                   cardNumber: formatted,
-                  bin: first6 || prev.bin
+                  bin: first6 || prev.bin,
+                  ...(detectedType ? { type: detectedType } : {})
                 }));
               }}
               className="border border-blue-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/10 text-blue-950"
@@ -1460,10 +1854,21 @@ export default function AdminPanel({
                 const cleanVal = e.target.value.replace(/\D/g, '');
                 const formatted = cleanVal.replace(/(\d{4})/g, '$1 ').trim();
                 const first6 = cleanVal.slice(0, 6);
+                let detectedType: 'Visa' | 'Mastercard' | 'Amex' | 'Discover' | null = null;
+                if (cleanVal.startsWith('4')) {
+                  detectedType = 'Visa';
+                } else if (cleanVal.startsWith('5') || /^2(22[1-9]|2[3-9]\d|[3-6]\d{2}|7[0-1]\d|720)/.test(cleanVal)) {
+                  detectedType = 'Mastercard';
+                } else if (cleanVal.startsWith('34') || cleanVal.startsWith('37')) {
+                  detectedType = 'Amex';
+                } else if (cleanVal.startsWith('6')) {
+                  detectedType = 'Discover';
+                }
                 setSingleCard(prev => ({
                   ...prev,
                   cardNumber: formatted,
-                  bin: first6 || prev.bin
+                  bin: first6 || prev.bin,
+                  ...(detectedType ? { type: detectedType } : {})
                 }));
               }}
               className="border border-blue-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/10 text-blue-950"
@@ -1709,54 +2114,6 @@ export default function AdminPanel({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="font-bold text-blue-900 flex items-center gap-1">
-              Card Number (16 Digits) *
-            </label>
-            <input
-              type="text"
-              maxLength={19}
-              value={singleCard.cardNumber || ''}
-              onChange={e => {
-                const cleanVal = e.target.value.replace(/\D/g, '');
-                const formatted = cleanVal.replace(/(\d{4})/g, '$1 ').trim();
-                const first6 = cleanVal.slice(0, 6);
-                setSingleCard(prev => ({
-                  ...prev,
-                  cardNumber: formatted,
-                  bin: first6 || prev.bin
-                }));
-              }}
-              className="border border-blue-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/10 text-blue-950"
-              placeholder="e.g. 4111 1111 1111 1111"
-              required
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="font-bold text-gray-800">Card BIN (First 6 Digits) *</label>
-            <input
-              type="text"
-              maxLength={6}
-              value={singleCard.bin}
-              onChange={e => setSingleCard(prev => ({ ...prev, bin: e.target.value }))}
-              className="border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono font-bold"
-              required
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="font-bold text-gray-800">CVV *</label>
-            <input
-              type="text"
-              maxLength={4}
-              value={singleCard.cvv || ''}
-              onChange={e => setSingleCard(prev => ({ ...prev, cvv: e.target.value }))}
-              className="border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono"
-              required
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
             <label className="font-bold text-gray-800">Full Name *</label>
             <input
               type="text"
@@ -1772,7 +2129,7 @@ export default function AdminPanel({
             <input
               type="text"
               value={singleCard.fullSsn || ''}
-              onChange={e => setSingleCard(prev => ({ ...prev, fullSsn: e.target.value }))}
+              onChange={e => setSingleCard(prev => ({ ...prev, fullSsn: e.target.value, ssn: e.target.value.trim() !== '' }))}
               className="border border-gray-300 rounded p-2 focus:outline-none font-mono"
               placeholder="e.g. 111-222-3333"
               required
@@ -1784,7 +2141,7 @@ export default function AdminPanel({
             <input
               type="text"
               value={singleCard.fullDob || ''}
-              onChange={e => setSingleCard(prev => ({ ...prev, fullDob: e.target.value }))}
+              onChange={e => setSingleCard(prev => ({ ...prev, fullDob: e.target.value, dob: e.target.value.trim() !== '' }))}
               className="border border-gray-300 rounded p-2 focus:outline-none font-mono"
               placeholder="e.g. 10/12/1988"
               required
@@ -1829,7 +2186,7 @@ export default function AdminPanel({
             <input
               type="text"
               value={singleCard.fullMmn || ''}
-              onChange={e => setSingleCard(prev => ({ ...prev, fullMmn: e.target.value }))}
+              onChange={e => setSingleCard(prev => ({ ...prev, fullMmn: e.target.value, mmn: e.target.value.trim() !== '' }))}
               className="border border-gray-300 rounded p-2 focus:outline-none"
               placeholder="e.g. MILLER"
             />
@@ -1851,7 +2208,7 @@ export default function AdminPanel({
             <input
               type="text"
               value={singleCard.fullDriverLicense || ''}
-              onChange={e => setSingleCard(prev => ({ ...prev, fullDriverLicense: e.target.value }))}
+              onChange={e => setSingleCard(prev => ({ ...prev, fullDriverLicense: e.target.value, driverLicense: e.target.value.trim() !== '' }))}
               className="border border-gray-300 rounded p-2 focus:outline-none font-mono"
               placeholder="e.g. D9123847"
             />
@@ -1862,7 +2219,7 @@ export default function AdminPanel({
             <input
               type="text"
               value={singleCard.fullPhone || ''}
-              onChange={e => setSingleCard(prev => ({ ...prev, fullPhone: e.target.value }))}
+              onChange={e => setSingleCard(prev => ({ ...prev, fullPhone: e.target.value, phone: e.target.value.trim() !== '' }))}
               className="border border-gray-300 rounded p-2 focus:outline-none"
               placeholder="e.g. +1 602-555-0199"
             />
@@ -1873,7 +2230,7 @@ export default function AdminPanel({
             <input
               type="text"
               value={singleCard.fullEmail || ''}
-              onChange={e => setSingleCard(prev => ({ ...prev, fullEmail: e.target.value }))}
+              onChange={e => setSingleCard(prev => ({ ...prev, fullEmail: e.target.value, email: e.target.value.trim() !== '' }))}
               className="border border-gray-300 rounded p-2 focus:outline-none"
               placeholder="e.g. smith@gmail.com"
             />
@@ -1895,7 +2252,7 @@ export default function AdminPanel({
             <input
               type="text"
               value={singleCard.fullAccountNumber || ''}
-              onChange={e => setSingleCard(prev => ({ ...prev, fullAccountNumber: e.target.value }))}
+              onChange={e => setSingleCard(prev => ({ ...prev, fullAccountNumber: e.target.value, accountNumber: e.target.value.trim() !== '' }))}
               className="border border-gray-300 rounded p-2 focus:outline-none font-mono"
               placeholder="e.g. 10029384812"
             />
@@ -1906,7 +2263,7 @@ export default function AdminPanel({
             <input
               type="text"
               value={singleCard.fullRoutingNumber || ''}
-              onChange={e => setSingleCard(prev => ({ ...prev, fullRoutingNumber: e.target.value }))}
+              onChange={e => setSingleCard(prev => ({ ...prev, fullRoutingNumber: e.target.value, routingNumber: e.target.value.trim() !== '' }))}
               className="border border-gray-300 rounded p-2 focus:outline-none font-mono"
               placeholder="e.g. 021000021"
             />
@@ -1922,6 +2279,231 @@ export default function AdminPanel({
               className="border border-emerald-300 rounded p-2 focus:outline-none focus:border-emerald-500 font-mono font-bold text-emerald-950"
               required
             />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">State / Region (e.g. NY) *</label>
+            <input
+              type="text"
+              maxLength={3}
+              value={singleCard.state}
+              onChange={e => setSingleCard(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none uppercase font-bold font-mono text-xs"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Country Code (e.g. US, CA) *</label>
+            <input
+              type="text"
+              maxLength={2}
+              value={singleCard.country}
+              onChange={e => setSingleCard(prev => ({ ...prev, country: e.target.value.toUpperCase() }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none uppercase font-bold font-mono text-xs"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Own / Rent *</label>
+            <select
+              value={singleCard.ownRent || ''}
+              onChange={e => setSingleCard(prev => ({ ...prev, ownRent: e.target.value as any }))}
+              className="border border-gray-300 rounded p-2 bg-white font-semibold focus:outline-none text-xs"
+              required
+            >
+              <option value="">- select -</option>
+              <option value="Own">Own</option>
+              <option value="Rent">Rent</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Years At Residence</label>
+            <input
+              type="text"
+              value={singleCard.yearsAtResidence || ''}
+              onChange={e => setSingleCard(prev => ({ ...prev, yearsAtResidence: e.target.value }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none text-xs"
+              placeholder="e.g. 3 years"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Income Type</label>
+            <input
+              type="text"
+              value={singleCard.incomeType || ''}
+              onChange={e => setSingleCard(prev => ({ ...prev, incomeType: e.target.value }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none text-xs"
+              placeholder="e.g. Salary, Self-Employed"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Employer</label>
+            <input
+              type="text"
+              value={singleCard.employer || ''}
+              onChange={e => setSingleCard(prev => ({ ...prev, employer: e.target.value }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none text-xs"
+              placeholder="e.g. Walmart Inc."
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Occupation</label>
+            <input
+              type="text"
+              value={singleCard.occupation || ''}
+              onChange={e => setSingleCard(prev => ({ ...prev, occupation: e.target.value }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none text-xs"
+              placeholder="e.g. Sales Associate"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Years Employed</label>
+            <input
+              type="text"
+              value={singleCard.yearsEmployed || ''}
+              onChange={e => setSingleCard(prev => ({ ...prev, yearsEmployed: e.target.value }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none text-xs"
+              placeholder="e.g. 2 years"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Work Phone</label>
+            <input
+              type="text"
+              value={singleCard.workPhone || ''}
+              onChange={e => setSingleCard(prev => ({ ...prev, workPhone: e.target.value }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none text-xs"
+              placeholder="e.g. +1 602-555-0100"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Net Monthly Income</label>
+            <input
+              type="text"
+              value={singleCard.netMonthlyIncome || ''}
+              onChange={e => setSingleCard(prev => ({ ...prev, netMonthlyIncome: e.target.value }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none text-xs"
+              placeholder="e.g. 4500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Base / Upload Batch *</label>
+            <input
+              type="text"
+              value={singleCard.base}
+              onChange={e => setSingleCard(prev => ({ ...prev, base: e.target.value }))}
+              className="border border-gray-300 rounded p-2 focus:outline-none font-semibold font-mono text-xs"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-gray-800">Discounted Profile? *</label>
+            <select
+              value={singleCard.discounted ? 'true' : 'false'}
+              onChange={e => setSingleCard(prev => ({ ...prev, discounted: e.target.value === 'true' }))}
+              className="border border-gray-300 rounded p-2 bg-white font-semibold focus:outline-none text-xs"
+            >
+              <option value="false">No (Full Price)</option>
+              <option value="true">Yes (Discounted)</option>
+            </select>
+          </div>
+
+          <div className="md:col-span-3 bg-indigo-50/50 p-4 rounded border border-indigo-200 mt-2">
+            <span className="block font-extrabold text-indigo-950 text-xs mb-3 uppercase tracking-wider">
+              Profile Inclusion Flags (Controls Filter Matches)
+            </span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-xs select-none">
+                <input
+                  type="checkbox"
+                  checked={singleCard.ssn}
+                  onChange={e => setSingleCard(prev => ({ ...prev, ssn: e.target.checked }))}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                Has SSN Record
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-xs select-none">
+                <input
+                  type="checkbox"
+                  checked={singleCard.dob}
+                  onChange={e => setSingleCard(prev => ({ ...prev, dob: e.target.checked }))}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                Has DOB Record
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-xs select-none">
+                <input
+                  type="checkbox"
+                  checked={singleCard.mmn}
+                  onChange={e => setSingleCard(prev => ({ ...prev, mmn: e.target.checked }))}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                Has MMN Record
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-xs select-none">
+                <input
+                  type="checkbox"
+                  checked={singleCard.driverLicense}
+                  onChange={e => setSingleCard(prev => ({ ...prev, driverLicense: e.target.checked }))}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                Has Driver License
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-xs select-none">
+                <input
+                  type="checkbox"
+                  checked={singleCard.phone}
+                  onChange={e => setSingleCard(prev => ({ ...prev, phone: e.target.checked }))}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                Has Phone Number
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-xs select-none">
+                <input
+                  type="checkbox"
+                  checked={singleCard.email}
+                  onChange={e => setSingleCard(prev => ({ ...prev, email: e.target.checked }))}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                Has Email Address
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-xs select-none">
+                <input
+                  type="checkbox"
+                  checked={singleCard.accountNumber}
+                  onChange={e => setSingleCard(prev => ({ ...prev, accountNumber: e.target.checked }))}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                Has Checking Account
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-700 text-xs select-none">
+                <input
+                  type="checkbox"
+                  checked={singleCard.routingNumber}
+                  onChange={e => setSingleCard(prev => ({ ...prev, routingNumber: e.target.checked }))}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                Has Routing Number
+              </label>
+            </div>
           </div>
 
           <div className="md:col-span-3 flex flex-col gap-1 mt-2">
@@ -2516,8 +3098,42 @@ export default function AdminPanel({
           <div className="bg-amber-50 border border-amber-200 p-3 rounded text-[11px] leading-relaxed text-amber-900 font-semibold">
             <p className="font-extrabold uppercase mb-1">Bulk Parser format instruction:</p>
             <p>Paste card elements line by line. Supported delimiter is the comma (,) or pipe (|).</p>
-            <p className="font-mono mt-1 text-[10px] bg-white border p-1 rounded">BIN | ZIP | BANK | COUNTRY | STATE | EXP_DATE</p>
-            <p className="mt-1">Example:<br />411111 | 90210 | CHASE BANK | US | CA | 12/28</p>
+            {bulkCategory === 'cvv2' ? (
+              <>
+                <p className="font-mono mt-1 text-[10px] bg-white border p-1 rounded">CARD_NUMBER | EXP_DATE | CVV | FULL_NAME | ZIP | BANK | COUNTRY | STATE</p>
+                <p className="mt-1">Example:<br />4000111122223333 | 12/28 | 123 | John Doe | 10001 | Chase Bank | US | NY</p>
+              </>
+            ) : bulkCategory === 'dumps' ? (
+              <>
+                <p className="font-mono mt-1 text-[10px] bg-white border p-1 rounded">TRACK_2 | CARD_NUMBER | EXP_DATE | ZIP | BANK | COUNTRY | STATE | TRACK_1</p>
+                <p className="mt-1">Example:<br />4111111111111111=281210100000 | 4111111111111111 | 12/28 | 10001 | Chase Bank | US | NY | B4111111111111111^SMITH/JOHN^281210100000</p>
+              </>
+            ) : bulkCategory === 'fullz' ? (
+              <>
+                <p className="font-mono mt-1 text-[10px] bg-white border p-1 rounded">CARD_NUMBER | EXP_DATE | CVV | FULL_NAME | SSN | DOB | ADDRESS | PHONE | EMAIL | ZIP | BANK | COUNTRY | STATE</p>
+                <p className="mt-1">Example:<br />4000111122223333 | 12/28 | 123 | John Doe | 000-00-0000 | 01/01/1990 | 123 Main St | +15550199 | user@example.com | 10001 | Chase Bank | US | NY</p>
+              </>
+            ) : bulkCategory === 'banklogs' ? (
+              <>
+                <p className="font-mono mt-1 text-[10px] bg-white border p-1 rounded">BANK | COUNTRY | STATE | ACCOUNT_TYPE | BALANCE | ACCESS_TYPE | USERNAME | PASSWORD</p>
+                <p className="mt-1">Example:<br />CHASE BANK | US | NY | Checking | 5000 | Online Login | chase_user | secretPass123</p>
+              </>
+            ) : bulkCategory === 'cashapp' ? (
+              <>
+                <p className="font-mono mt-1 text-[10px] bg-white border p-1 rounded">CASHTAG | BALANCE | USERNAME | PASSWORD | EMAIL | PHONE | PIN</p>
+                <p className="mt-1">Example:<br />$cashking | 450.00 | cash_user | pass123 | cash@mail.com | +15550199 | 1234</p>
+              </>
+            ) : bulkCategory === 'paypal' ? (
+              <>
+                <p className="font-mono mt-1 text-[10px] bg-white border p-1 rounded">EMAIL | PASSWORD | BALANCE | COOKIES</p>
+                <p className="mt-1">Example:<br />paypal@mail.com | pass123 | 250.00 | CookieSessionDataHere</p>
+              </>
+            ) : (
+              <>
+                <p className="font-mono mt-1 text-[10px] bg-white border p-1 rounded">IP_ADDRESS | CITY | OS | ACCESS_TYPE | USERNAME | PASSWORD | COUNTRY | STATE | SPEED</p>
+                <p className="mt-1">Example:<br />192.168.1.100 | New York | Windows Server 2022 | Admin | Administrator | securePass123 | US | NY | 1Gbps</p>
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -2526,11 +3142,15 @@ export default function AdminPanel({
               <select
                 value={bulkCategory}
                 onChange={e => setBulkCategory(e.target.value as any)}
-                className="border border-gray-300 rounded p-2 bg-white font-semibold"
+                className="border border-gray-300 rounded p-2 bg-white font-semibold text-gray-800"
               >
                 <option value="cvv2">CVV2 Cards</option>
                 <option value="dumps">Dumps Track 1/2</option>
                 <option value="fullz">Fullz (Complete profile with SSN/DOB)</option>
+                <option value="banklogs">Banklogs (Login details & balance)</option>
+                <option value="cashapp">CashApp Accounts</option>
+                <option value="paypal">PayPal Accounts</option>
+                <option value="rdp">RDP / VPS Servers</option>
               </select>
             </div>
 
@@ -2679,8 +3299,10 @@ export default function AdminPanel({
               <label className="font-bold text-gray-800">Total Cards Count *</label>
               <input
                 type="number"
+                min={1}
+                max={50}
                 value={wholesaleCount}
-                onChange={e => setWholesaleCount(parseInt(e.target.value) || 0)}
+                onChange={e => handleWholesaleCountChange(parseInt(e.target.value) || 0)}
                 className="border border-gray-300 rounded p-2 focus:outline-none focus:border-purple-500 font-mono font-bold"
                 required
               />
@@ -2734,6 +3356,37 @@ export default function AdminPanel({
                 required
               />
             </div>
+
+            {/* Individual Card Inputs Section */}
+            {wholesaleCount > 0 && wholesaleCount <= 20 && (
+              <div className="md:col-span-2 border-t pt-4 mt-2">
+                <h4 className="font-extrabold text-xs text-purple-950 mb-1 uppercase tracking-wide flex items-center gap-1.5">
+                  📦 Enter Individual Cards Credentials ({wholesaleCount} Items)
+                </h4>
+                <p className="text-[10px] text-gray-500 mb-3 leading-relaxed">
+                  Provide credentials for each card (Format: <code className="font-semibold text-purple-700 bg-purple-50 px-1 rounded">CARD_NUMBER | EXP | CVV | NAME | SSN/ZIP | DOB/BANK | ADDRESS | PHONE | TRACKS</code>). When users buy this wholesale pack, they will unlock exactly these {wholesaleCount} cards!
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto p-1 border rounded bg-white">
+                  {Array.from({ length: wholesaleCount }).map((_, idx) => (
+                    <div key={idx} className="flex flex-col gap-0.5 bg-gray-50 p-2 rounded border border-gray-100">
+                      <label className="text-[9px] font-extrabold text-purple-800 uppercase">Card #{idx + 1} Credentials *</label>
+                      <input
+                        type="text"
+                        value={wholesaleCardInputs[idx] || ''}
+                        onChange={e => {
+                          const updated = [...wholesaleCardInputs];
+                          updated[idx] = e.target.value;
+                          setWholesaleCardInputs(updated);
+                        }}
+                        placeholder="CARD_NUMBER | 12/28 | 123 | John Doe"
+                        className="border border-gray-300 rounded p-1 font-mono text-[10px] text-purple-950 focus:border-purple-500"
+                        required
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="md:col-span-2 flex justify-end mt-2">
               <button
@@ -2884,12 +3537,12 @@ export default function AdminPanel({
             
             <div className="flex flex-col sm:flex-row gap-2 shrink-0">
               <a
-                href="https://t.me/mariafq"
+                href="https://t.me/protocolcc_bot"
                 target="_blank"
                 rel="noreferrer"
                 className="bg-[#24a1de]/20 hover:bg-[#24a1de]/30 text-[#1f84b6] border border-[#24a1de]/40 px-3 py-1.5 rounded font-extrabold flex items-center gap-1.5 text-[10px] uppercase tracking-wide transition-all"
               >
-                ✈️ Support Escalation Chat
+                ✈️ Support Escalation Chat (@protocolcc_bot)
               </a>
               <a
                 href="https://t.me/+HWRd8CbPTjU0YTU0"
@@ -3101,72 +3754,33 @@ export default function AdminPanel({
         </div>
       )}
 
-      {/* TAB 3: Addresses */}
+      {/* TAB 3: Telegram Username Settings */}
       {adminTab === 'addresses' && (
         <form onSubmit={handleSettingsSubmit} className="flex flex-col gap-4">
-          <div className="bg-blue-50 border border-blue-200 p-3 rounded text-[11px] leading-relaxed text-blue-900 font-semibold flex items-start gap-2">
-            <Wallet className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+          <div className="bg-sky-50 border border-sky-200 p-3 rounded text-[11px] leading-relaxed text-sky-950 font-semibold flex items-start gap-2">
+            <Send className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
             <div>
-              <p className="font-extrabold uppercase">Cryptocurrency Deposit Addresses configuration</p>
-              <p>These addresses are loaded live in the "Add Funds" modal whenever clients request to deposit Bitcoin, Litecoin, Ethereum, or Tether USDT.</p>
+              <p className="font-extrabold uppercase text-sky-900">Telegram Username Settings</p>
+              <p>This setting controls the live Telegram support username displayed on tickets and support contacts across the application for all users.</p>
             </div>
           </div>
 
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <label className="font-bold text-gray-800 flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-amber-500 rounded-full" /> Bitcoin (BTC) address:
+                <span className="w-2 h-2 bg-sky-400 rounded-full" /> Telegram Contact Username (for Support escalation):
               </label>
               <input
                 type="text"
-                value={settingsForm.btcAddress}
-                onChange={e => setSettingsForm(prev => ({ ...prev, btcAddress: e.target.value }))}
+                value={settingsForm.telegramUsername}
+                onChange={e => setSettingsForm(prev => ({ ...prev, telegramUsername: e.target.value }))}
                 className="border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono font-semibold"
-                placeholder="BTC Address"
+                placeholder="@protocolcc_bot"
                 required
               />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="font-bold text-gray-800 flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-green-500 rounded-full" /> Tether (USDT) address:
-              </label>
-              <input
-                type="text"
-                value={settingsForm.usdtAddress}
-                onChange={e => setSettingsForm(prev => ({ ...prev, usdtAddress: e.target.value }))}
-                className="border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono font-semibold"
-                placeholder="USDT TRC-20 Address"
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="font-bold text-gray-800 flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-sky-500 rounded-full" /> Litecoin (LTC) address:
-              </label>
-              <input
-                type="text"
-                value={settingsForm.ltcAddress}
-                onChange={e => setSettingsForm(prev => ({ ...prev, ltcAddress: e.target.value }))}
-                className="border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono font-semibold"
-                placeholder="LTC Address"
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="font-bold text-gray-800 flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-indigo-500 rounded-full" /> Ethereum (ETH) address:
-              </label>
-              <input
-                type="text"
-                value={settingsForm.ethAddress}
-                onChange={e => setSettingsForm(prev => ({ ...prev, ethAddress: e.target.value }))}
-                className="border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500 font-mono font-semibold"
-                placeholder="ETH Address"
-                required
-              />
+              <span className="text-[10px] text-gray-500 font-semibold italic">
+                Users can click this telegram contact username under the Support tab to open chat with you. E.g. @protocolcc_bot or admin_tg
+              </span>
             </div>
           </div>
 
@@ -3182,7 +3796,7 @@ export default function AdminPanel({
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4" /> Save Live payment Options
+                  <CheckCircle2 className="w-4 h-4" /> Save Telegram Username
                 </>
               )}
             </button>

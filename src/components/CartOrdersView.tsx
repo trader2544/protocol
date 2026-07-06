@@ -3,6 +3,91 @@ import { ShoppingCart, Trash2, CheckCircle2, ShieldCheck, Download, AlertCircle,
 import { CardItem, UserProfile } from '../types';
 import { updateUserProfile } from '../utils/dbService';
 
+const fieldMapping: Record<string, { label: string; isMono?: boolean }> = {
+  // Card Details
+  fullCc: { label: 'Card Number', isMono: true },
+  cardNumber: { label: 'Card Number', isMono: true },
+  expDate: { label: 'Expiration Date', isMono: true },
+  fullCvv: { label: 'CVV/CVV2 Code', isMono: true },
+  cvv: { label: 'CVV/CVV2 Code', isMono: true },
+  fullName: { label: 'Cardholder Name' },
+  fullAddressStr: { label: 'Billing Address' },
+  fullPhone: { label: 'Phone Number' },
+  fullSsn: { label: 'SSN (Social Security)', isMono: true },
+  fullDob: { label: 'Date of Birth (DOB)', isMono: true },
+  fullMmn: { label: "Mother's Maiden Name (MMN)" },
+  fullAtmPin: { label: 'ATM PIN', isMono: true },
+  fullDriverLicense: { label: "Driver's License No." },
+  fullEmail: { label: 'Secure Email Address' },
+  fullEmailPassword: { label: 'Email Password', isMono: true },
+  fullAccountNumber: { label: 'Bank Account Number', isMono: true },
+  fullRoutingNumber: { label: 'Bank Routing Number', isMono: true },
+  track1: { label: 'Track 1 Data', isMono: true },
+  track2: { label: 'Track 2 Data', isMono: true },
+  base: { label: 'Base / Upload Group' },
+
+  // Banklog / Log details
+  loginUsername: { label: 'Login Username/Email' },
+  loginPassword: { label: 'Login Password', isMono: true },
+  bankBalance: { label: 'Account Balance', isMono: true },
+  bankAccountType: { label: 'Account Type' },
+  bankAccessType: { label: 'Access Level/Type' },
+
+  // CashApp Details
+  cashappUsername: { label: 'Cashtag Username' },
+  cashappEmail: { label: 'Linked Email' },
+  cashappPhone: { label: 'Linked Phone' },
+  cashappPin: { label: 'Account PIN', isMono: true },
+  cashappBalance: { label: 'Cash Balance', isMono: true },
+
+  // PayPal Details
+  paypalEmail: { label: 'PayPal Email' },
+  paypalPassword: { label: 'PayPal Password', isMono: true },
+  paypalBalance: { label: 'PayPal Balance', isMono: true },
+  paypalCookies: { label: 'Session Cookies', isMono: true },
+
+  // RDP Details
+  rdpIp: { label: 'RDP Host IP', isMono: true },
+  rdpUsername: { label: 'RDP Login Username' },
+  rdpPassword: { label: 'RDP Login Password', isMono: true },
+  rdpCountry: { label: 'RDP Host Country' },
+  rdpState: { label: 'RDP Host State' },
+  rdpCity: { label: 'RDP Host City' },
+  rdpOs: { label: 'Operating System' },
+  rdpAccessType: { label: 'Access Privileges' },
+  rdpHospeed: { label: 'Connection Speed' },
+};
+
+const renderOrderDetails = (order: any) => {
+  const entries: { key: string; label: string; value: string; isMono?: boolean }[] = [];
+  
+  Object.entries(fieldMapping).forEach(([key, config]) => {
+    const val = order[key];
+    if (val !== undefined && val !== null && val !== '' && val !== false && val !== 'N/A') {
+      if (key === 'cardNumber' && order.fullCc) return;
+      if (key === 'cvv' && order.fullCvv) return;
+      
+      let displayVal = val;
+      if (typeof val === 'number') {
+        if (key.toLowerCase().includes('balance')) {
+          displayVal = `$${val.toFixed(2)}`;
+        } else {
+          displayVal = val.toString();
+        }
+      }
+      
+      entries.push({
+        key,
+        label: config.label,
+        value: displayVal.toString(),
+        isMono: config.isMono,
+      });
+    }
+  });
+
+  return entries;
+};
+
 interface CartOrdersViewProps {
   cart: CardItem[];
   setCart: React.Dispatch<React.SetStateAction<CardItem[]>>;
@@ -36,6 +121,10 @@ export default function CartOrdersView({
   const [fundsToAdd, setFundsToAdd] = useState<string>('50');
   const [selectedDetailsOrder, setSelectedDetailsOrder] = useState<any | null>(null);
 
+  // Filters state
+  const [filterDays, setFilterDays] = useState<string>('all');
+  const [filterProduct, setFilterProduct] = useState<string>('all');
+
   // Computed totals
   const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
 
@@ -55,47 +144,211 @@ export default function CartOrdersView({
     }
 
     // Deduct balance and update crabs
-    const purchasedItems = cart.map(item => {
-      // Generate realistic carding mock credentials
-      let prefix = item.bin;
-      let ccNum = prefix;
-      while (ccNum.length < 16) {
-        ccNum += Math.floor(Math.random() * 10).toString();
+    const purchasedItems: any[] = [];
+    
+    cart.forEach(item => {
+      if (item.base === 'WHOLESALE_PACK' && item.packCount && item.packCount >= 1) {
+        // Generate packCount separate individual card items!
+        for (let i = 0; i < item.packCount; i++) {
+          let bin = '';
+          let bank = 'WHOLESALE SECURE BANK';
+          let brand: 'Visa' | 'Mastercard' | 'Amex' | 'Discover' = 'Visa';
+          let selectName = '';
+          let selectState = 'NY';
+          let fullCc = '';
+          let cvv = '';
+          let fullAddressStr = '';
+          let fullPhone = '';
+          let fullSsn = '';
+          let fullDob = '';
+          let track1 = '';
+          let track2 = '';
+
+          const detailStr = item.cardsDetails && item.cardsDetails[i];
+          if (detailStr) {
+            const parts = detailStr.split(/[|,]/).map(s => s.trim());
+            let ccNum = parts[0] || '4111111111111111';
+            if (ccNum.includes('=')) {
+              track2 = ccNum;
+              ccNum = ccNum.split('=')[0];
+            } else {
+              track2 = `${ccNum}=281210100000`;
+            }
+            bin = ccNum.replace(/\D/g, '').substring(0, 6) || '411111';
+            brand = bin.startsWith('4') ? 'Visa' : bin.startsWith('5') ? 'Mastercard' : bin.startsWith('3') ? 'Amex' : 'Discover';
+            cvv = parts[2] || '123';
+            selectName = parts[3] || 'John Miller';
+            fullCc = ccNum.replace(/(\d{4})/g, '$1 ').trim();
+            fullAddressStr = parts[6] || `742 Evergreen Terrace, New York, NY, ${parts[4] || '10001'}, ${item.country || 'US'}`;
+            fullPhone = parts[7] || `+1 555-0199`;
+            fullSsn = parts[4] || '000-00-0000';
+            fullDob = parts[5] || '01/01/1990';
+            track1 = parts[8] || `B${ccNum}^${selectName.toUpperCase().replace(/\s+/g, '/')}^281210100000`;
+            if (parts[5] && parts[5].length > 4 && isNaN(Number(parts[5]))) {
+              bank = parts[5].toUpperCase();
+            }
+          } else {
+            const randomBins = ['411111', '400022', '448530', '510510', '542418', '378288', '601100'];
+            bin = randomBins[Math.floor(Math.random() * randomBins.length)];
+            bank = 'WHOLESALE SECURE BANK';
+            brand = bin.startsWith('4') ? 'Visa' : bin.startsWith('5') ? 'Mastercard' : bin.startsWith('3') ? 'Amex' : 'Discover';
+            const names = ['John Miller', 'Sarah Connor', 'Michael Scott', 'Patrick Kamande', 'Emily Davis', 'Robert Vance', 'Bruce Wayne', 'Diana Prince', 'Clark Kent', 'Selina Kyle'];
+            selectName = names[Math.floor(Math.random() * names.length)];
+            const states = ['NY', 'CA', 'TX', 'FL', 'IL', 'GA', 'MI', 'WA'];
+            selectState = states[Math.floor(Math.random() * states.length)];
+            
+            let prefix = bin;
+            let ccNum = prefix;
+            while (ccNum.length < 16) {
+              ccNum += Math.floor(Math.random() * 10).toString();
+            }
+            fullCc = ccNum.replace(/(\d{4})/g, '$1 ').trim();
+            cvv = (Math.floor(Math.random() * 900) + 100).toString();
+            const addresses = ['742 Evergreen Terrace', '1725 Slough Avenue', '10455 Magnolia Ave', '221B Baker St', '1600 Amphitheatre Pkwy', '1007 Mountain Drive', '4 Privet Drive'];
+            const selectAddr = addresses[Math.floor(Math.random() * addresses.length)];
+            const cities: Record<string, string> = { CA: 'Los Angeles', NY: 'New York', TX: 'Houston', FL: 'Miami', IL: 'Chicago', GA: 'Atlanta', MI: 'Detroit', WA: 'Seattle' };
+            const selectCity = cities[selectState] || 'Springfield';
+            fullAddressStr = `${selectAddr}, ${selectCity}, ${selectState}, ${Math.floor(Math.random() * 90000) + 10000}, ${item.country || 'US'}`;
+            fullPhone = `+1 ${Math.floor(Math.random() * 900) + 100}-555-0199`;
+            fullSsn = `${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 90) + 10}-${Math.floor(Math.random() * 9000) + 1000}`;
+            fullDob = `${Math.floor(Math.random() * 12) + 1}/${Math.floor(Math.random() * 28) + 1}/${Math.floor(Math.random() * 30) + 1975}`;
+            track1 = `B${ccNum}^${selectName.toUpperCase().replace(/\s+/g, '/')}^281210100000`;
+            track2 = `${ccNum}=281210100000`;
+          }
+ 
+          const singleItem: any = {
+            ...item,
+            id: `wholesale-item-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+            bin,
+            bank,
+            type: brand,
+            state: selectState,
+            price: 0, // bundled
+            category: 'cvv2',
+            base: `BULK_WHOLESALE_ITEM_${i + 1}_OF_${item.packCount}`,
+            purchaseId: `ord-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+            purchaseDate: new Date().toLocaleString(),
+            purchaseTimestamp: Date.now(),
+            revealed: false,
+            tested: 'untested',
+            fullCc,
+            fullCvv: cvv,
+            fullName: selectName,
+            fullAddressStr,
+            fullPhone,
+            fullSsn,
+            fullDob,
+            track1,
+            track2,
+          };
+          purchasedItems.push(singleItem);
+        }
+      } else {
+        const orderObj: any = {
+          ...item,
+          purchaseId: `ord-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+          purchaseDate: new Date().toLocaleString(),
+          purchaseTimestamp: Date.now(),
+          revealed: false,
+          tested: 'untested', // 'untested' | 'valid' | 'dead'
+        };
+
+        // Ensure exact keys are mapped for rendering from the admin-uploaded details ONLY IF they are filled out
+        if (item.cardNumber) {
+          orderObj.fullCc = item.cardNumber;
+        } else if (item.id && String(item.id).startsWith('card-')) {
+          // Fallback realistic credentials ONLY for the mock demo cards to make sure they look complete on checkout
+          let prefix = item.bin;
+          let ccNum = prefix;
+          while (ccNum.length < 16) {
+            ccNum += Math.floor(Math.random() * 10).toString();
+          }
+          orderObj.fullCc = ccNum.replace(/(\d{4})/g, '$1 ').trim();
+        }
+
+        if (item.cvv) {
+          orderObj.fullCvv = item.cvv;
+        } else if (item.id && String(item.id).startsWith('card-')) {
+          orderObj.fullCvv = (Math.floor(Math.random() * 900) + 100).toString();
+        }
+
+        if (item.fullName) {
+          orderObj.fullName = item.fullName;
+        } else if (item.id && String(item.id).startsWith('card-')) {
+          const names = ['John Miller', 'Sarah Connor', 'Michael Scott', 'Patrick Kamande', 'Emily Davis', 'Robert Vance'];
+          orderObj.fullName = names[Math.floor(Math.random() * names.length)];
+        }
+
+        if (item.fullAddressStr) {
+          orderObj.fullAddressStr = item.fullAddressStr;
+        } else if (item.id && String(item.id).startsWith('card-')) {
+          const addresses = ['742 Evergreen Terrace', '1725 Slough Avenue', '10455 Magnolia Ave', '221B Baker St', '1600 Amphitheatre Pkwy'];
+          const selectAddr = addresses[Math.floor(Math.random() * addresses.length)];
+          const cities: Record<string, string> = { CA: 'Los Angeles', NY: 'New York', TX: 'Houston', FL: 'Miami', ON: 'Toronto', LND: 'London' };
+          const selectCity = cities[item.state] || 'Springfield';
+          orderObj.fullAddressStr = `${selectAddr}, ${selectCity}, ${item.state}, ${item.zip}, ${item.country}`;
+        }
+
+        if (item.fullPhone) {
+          orderObj.fullPhone = item.fullPhone;
+        } else if (item.id && String(item.id).startsWith('card-') && item.phone) {
+          orderObj.fullPhone = `+1 ${Math.floor(Math.random() * 900) + 100}-555-0199`;
+        }
+
+        if (item.fullSsn) {
+          orderObj.fullSsn = item.fullSsn;
+        } else if (item.id && String(item.id).startsWith('card-') && item.ssn) {
+          orderObj.fullSsn = `${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 90) + 10}-${Math.floor(Math.random() * 9000) + 1000}`;
+        }
+
+        if (item.fullDob) {
+          orderObj.fullDob = item.fullDob;
+        } else if (item.id && String(item.id).startsWith('card-') && item.dob) {
+          orderObj.fullDob = `${Math.floor(Math.random() * 12) + 1}/${Math.floor(Math.random() * 28) + 1}/${Math.floor(Math.random() * 30) + 1975}`;
+        }
+
+        if (item.fullMmn) {
+          orderObj.fullMmn = item.fullMmn;
+        }
+
+        if (item.fullAtmPin) {
+          orderObj.fullAtmPin = item.fullAtmPin;
+        }
+
+        if (item.fullDriverLicense) {
+          orderObj.fullDriverLicense = item.fullDriverLicense;
+        }
+
+        if (item.fullEmail) {
+          orderObj.fullEmail = item.fullEmail;
+        }
+
+        if (item.fullEmailPassword) {
+          orderObj.fullEmailPassword = item.fullEmailPassword;
+        }
+
+        if (item.fullAccountNumber) {
+          orderObj.fullAccountNumber = item.fullAccountNumber;
+        }
+
+        if (item.fullRoutingNumber) {
+          orderObj.fullRoutingNumber = item.fullRoutingNumber;
+        }
+
+        if (item.track1) {
+          orderObj.track1 = item.track1;
+        } else if (item.id && String(item.id).startsWith('card-') && !orderObj.withoutCvv2) {
+          orderObj.track1 = `B${(orderObj.fullCc || '').replace(/\s+/g, '')}^${(orderObj.fullName || 'HOLDER').toUpperCase().replace(/\s+/g, '/')}^${(orderObj.expDate || '12/28').replace('/', '')}10100000`;
+        }
+
+        if (item.track2) {
+          orderObj.track2 = item.track2;
+        } else if (item.id && String(item.id).startsWith('card-') && !orderObj.withoutCvv2) {
+          orderObj.track2 = `${(orderObj.fullCc || '').replace(/\s+/g, '')}=${(orderObj.expDate || '12/28').replace('/', '')}10100000`;
+        }
+
+        purchasedItems.push(orderObj);
       }
-      const formattedNum = item.cardNumber || ccNum.replace(/(\d{4})/g, '$1 ').trim();
-      const cvv = item.cvv || (Math.floor(Math.random() * 900) + 100).toString();
-      const names = ['John Miller', 'Sarah Connor', 'Michael Scott', 'Patrick Kamande', 'Emily Davis', 'Robert Vance'];
-      const addresses = ['742 Evergreen Terrace', '1725 Slough Avenue', '10455 Magnolia Ave', '221B Baker St', '1600 Amphitheatre Pkwy'];
-      
-      const selectName = item.fullName || names[Math.floor(Math.random() * names.length)];
-      const selectAddr = addresses[Math.floor(Math.random() * addresses.length)];
-      const cities: Record<string, string> = { CA: 'Los Angeles', NY: 'New York', TX: 'Houston', FL: 'Miami', ON: 'Toronto', LND: 'London' };
-      const selectCity = cities[item.state] || 'Springfield';
-      const addressString = item.fullAddressStr || `${selectAddr}, ${selectCity}, ${item.state}, ${item.zip}, ${item.country}`;
-      const phoneString = item.fullPhone || `+1 ${Math.floor(Math.random() * 900) + 100}-555-0199`;
-
-      const genSsn = item.fullSsn || (item.ssn ? `${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 90) + 10}-${Math.floor(Math.random() * 9000) + 1000}` : null);
-      const genDob = item.fullDob || (item.dob ? `${Math.floor(Math.random() * 12) + 1}/${Math.floor(Math.random() * 28) + 1}/${Math.floor(Math.random() * 30) + 1975}` : null);
-
-      const t1 = item.track1 || `B${formattedNum.replace(/\s+/g, '')}^${selectName.toUpperCase().replace(/\s+/g, '/')}^${item.expDate.replace('/', '')}10100000`;
-      const t2 = item.track2 || `${formattedNum.replace(/\s+/g, '')}=${item.expDate.replace('/', '')}10100000`;
-
-      return {
-        ...item,
-        purchaseId: `ord-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        purchaseDate: new Date().toLocaleString(),
-        revealed: false,
-        tested: 'untested', // 'untested' | 'valid' | 'dead'
-        fullCc: formattedNum,
-        fullCvv: cvv,
-        fullName: selectName,
-        fullAddressStr: addressString,
-        fullPhone: phoneString,
-        fullSsn: genSsn,
-        fullDob: genDob,
-        track1: t1,
-        track2: t2,
-      };
     });
 
     setUser(prev => ({
@@ -331,6 +584,39 @@ export default function CartOrdersView({
   }
 
   // orders tab
+  const getOrderTime = (order: any) => {
+    if (order.purchaseTimestamp) return order.purchaseTimestamp;
+    if (order.timestamp) {
+      const parsed = new Date(order.timestamp).getTime();
+      if (!isNaN(parsed)) return parsed;
+    }
+    if (order.purchaseDate) {
+      const parsed = new Date(order.purchaseDate).getTime();
+      if (!isNaN(parsed)) return parsed;
+    }
+    return Date.now();
+  };
+
+  const filteredOrders = orders.filter(order => {
+    // 1. Filter by category
+    if (filterProduct !== 'all') {
+      const category = order.category || (order.withoutCvv2 ? 'dumps' : (order.ssn || order.dob ? 'fullz' : 'cvv2'));
+      if (category !== filterProduct) return false;
+    }
+
+    // 2. Filter by days
+    if (filterDays !== 'all') {
+      const orderTime = getOrderTime(order);
+      const diffMs = Date.now() - orderTime;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      
+      const maxDays = parseFloat(filterDays);
+      if (!isNaN(maxDays) && diffDays > maxDays) return false;
+    }
+
+    return true;
+  });
+
   return (
     <div className="bg-white border border-gray-300 rounded-sm p-4 shadow-xs text-xs flex flex-col gap-4">
       <h2 className="text-sm font-bold text-[#0c5460] uppercase border-b pb-2 flex items-center gap-2">
@@ -343,188 +629,218 @@ export default function CartOrdersView({
         </div>
       ) : (
         <div className="flex flex-col gap-3.5">
-          {orders.map(order => {
-            const hasTester = order.onlyRefundable;
-            const isUntested = order.tested === 'untested';
-            const isValid = order.tested === 'valid';
-            const isDead = order.tested === 'dead';
+          {/* Dynamic Filters Row */}
+          <div className="bg-gray-50 border border-gray-200 p-3 rounded flex flex-col sm:flex-row gap-3 items-center justify-between text-xs select-none">
+            <div className="flex flex-wrap items-center gap-3.5 w-full sm:w-auto">
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-gray-700 uppercase text-[10px]">Date Purchased:</span>
+                <select
+                  value={filterDays}
+                  onChange={e => setFilterDays(e.target.value)}
+                  className="border border-gray-300 rounded p-1 bg-white text-[11px] font-bold text-gray-800 focus:outline-none focus:border-blue-400"
+                >
+                  <option value="all">All Days</option>
+                  <option value="1">Last 24 Hours</option>
+                  <option value="3">Last 3 Days</option>
+                  <option value="7">Last 7 Days</option>
+                  <option value="30">Last 30 Days</option>
+                </select>
+              </div>
 
-            return (
-              <div
-                key={order.purchaseId}
-                className={`border rounded p-4 flex flex-col gap-3 relative overflow-hidden transition-all ${
-                  isDead
-                    ? 'border-red-200 bg-red-50/20 opacity-70'
-                    : isValid
-                    ? 'border-emerald-200 bg-emerald-50/10'
-                    : 'border-gray-200 bg-gray-50/20'
-                }`}
-              >
-                {/* Status Indicator Tag */}
-                <div className="flex justify-between items-start border-b pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-gray-900 font-mono">BIN {order.bin}</span>
-                    <span className="text-gray-400 font-medium text-[10px]">Purchased: {order.purchaseDate}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-gray-700 uppercase text-[10px]">Product Bought:</span>
+                <select
+                  value={filterProduct}
+                  onChange={e => setFilterProduct(e.target.value)}
+                  className="border border-gray-300 rounded p-1 bg-white text-[11px] font-bold text-gray-800 focus:outline-none focus:border-blue-400"
+                >
+                  <option value="all">All Products</option>
+                  <option value="cvv2">CVV2 Cards</option>
+                  <option value="dumps">Dumps Track 1/2</option>
+                  <option value="fullz">Fullz Profiles</option>
+                  <option value="banklogs">Bank Logs</option>
+                  <option value="cashapp">CashApp Accounts</option>
+                  <option value="paypal">PayPal Logs</option>
+                  <option value="rdp">RDP Servers</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="text-[10px] text-gray-500 font-extrabold uppercase shrink-0">
+              Showing {filteredOrders.length} of {orders.length} orders
+            </div>
+          </div>
+
+          {filteredOrders.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 font-medium border border-dashed rounded bg-gray-50">
+              No orders found matching the selected filters.
+            </div>
+          ) : (
+            filteredOrders.map(order => {
+              const hasTester = order.onlyRefundable;
+              const isUntested = order.tested === 'untested';
+              const isValid = order.tested === 'valid';
+              const isDead = order.tested === 'dead';
+
+              return (
+                <div
+                  key={order.purchaseId}
+                  className={`border rounded p-4 flex flex-col gap-3 relative overflow-hidden transition-all ${
+                    isDead
+                      ? 'border-red-200 bg-red-50/20 opacity-70'
+                      : isValid
+                      ? 'border-emerald-200 bg-emerald-50/10'
+                      : 'border-gray-200 bg-gray-50/20'
+                  }`}
+                >
+                  {/* Status Indicator Tag */}
+                  <div className="flex justify-between items-start border-b pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-gray-900 font-mono">BIN {order.bin || 'N/A'}</span>
+                      <span className="text-gray-400 font-medium text-[10px]">Purchased: {order.purchaseDate}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {hasTester && (
+                        <span className="bg-amber-100 text-amber-800 border border-amber-200 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">
+                          Refundable Tester Covered
+                        </span>
+                      )}
+                      {isDead ? (
+                        <span className="bg-red-100 text-red-800 border border-red-200 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">
+                          DEAD (REFUNDED)
+                        </span>
+                      ) : isValid ? (
+                        <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">
+                          VALID
+                        </span>
+                      ) : (
+                        <span className="bg-gray-100 border text-gray-600 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">
+                          UNCHECKED
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {hasTester && (
-                      <span className="bg-amber-100 text-amber-800 border border-amber-200 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">
-                        Refundable Tester Covered
-                      </span>
-                    )}
-                    {isDead ? (
-                      <span className="bg-red-100 text-red-800 border border-red-200 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">
-                        DEAD (REFUNDED)
-                      </span>
-                    ) : isValid ? (
-                      <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">
-                        VALID
-                      </span>
+                  {/* Card diagnostic parameters */}
+                  <div className="text-[11px] font-medium leading-relaxed">
+                    {!order.revealed || isDead ? (
+                      <div className="bg-gray-50 border border-gray-100 p-3 rounded-sm italic text-gray-400 text-center select-none">
+                        Credentials are encrypted. Click <span className="font-bold text-gray-600">"Reveal Credentials"</span> below or <span className="font-bold text-sky-600">"View Details"</span> to decrypt the security keys.
+                      </div>
                     ) : (
-                      <span className="bg-gray-100 border text-gray-600 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">
-                        UNCHECKED
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Card diagnostic parameters */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-medium text-gray-600 leading-relaxed">
-                  <div>
-                    <p className="font-bold text-gray-400 uppercase text-[9px] mb-1">Secure CC details</p>
-                    {order.revealed && !isDead ? (
-                      <div className="flex flex-col gap-1 select-all font-mono">
-                        {order.withoutCvv2 ? (
-                          <>
-                            <p className="truncate" title={order.track1}><span className="text-gray-400 text-[10px]">Track1:</span> <span className="font-bold text-gray-900 text-[10px]">{order.track1}</span></p>
-                            <p className="truncate" title={order.track2}><span className="text-gray-400 text-[10px]">Track2:</span> <span className="font-bold text-gray-900 text-[10px]">{order.track2}</span></p>
-                            <p><span className="text-gray-400 text-[10px]">Exp:</span> <span className="font-bold text-gray-900 text-[10px]">{order.expDate}</span></p>
-                          </>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {renderOrderDetails(order).length === 0 ? (
+                          <div className="md:col-span-3 text-center py-4 bg-gray-50 border border-gray-150 rounded text-gray-400 italic">
+                            No additional credentials uploaded for this record by the administrator.
+                          </div>
                         ) : (
-                          <>
-                            <p><span className="text-gray-400">Card:</span> <span className="font-bold text-gray-900">{order.fullCc}</span></p>
-                            <p><span className="text-gray-400">Exp:</span> <span className="font-bold text-gray-900">{order.expDate}</span></p>
-                            <p><span className="text-gray-400">CVV:</span> <span className="font-bold text-gray-900">{order.fullCvv}</span></p>
-                          </>
+                          renderOrderDetails(order).map((field) => (
+                            <div key={field.key} className="bg-gray-50/50 border border-gray-200 p-2 rounded flex flex-col gap-0.5 select-all">
+                              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wide">
+                                {field.label}
+                              </span>
+                              {field.key === 'paypalCookies' ? (
+                                <span className="font-mono text-[10px] font-semibold truncate text-gray-900" title={field.value}>
+                                  {field.value.substring(0, 30)}...
+                                </span>
+                              ) : (
+                                <span className={`text-[11px] font-bold text-gray-900 ${field.isMono ? 'font-mono' : ''}`}>
+                                  {field.value}
+                                </span>
+                              )}
+                            </div>
+                          ))
                         )}
                       </div>
-                    ) : (
-                      <p className="italic text-gray-400">Details are hidden. Click "Reveal" below to decode.</p>
                     )}
                   </div>
 
-                  <div>
-                    <p className="font-bold text-gray-400 uppercase text-[9px] mb-1">Billing holder info</p>
-                    {order.revealed && !isDead ? (
-                      <div className="flex flex-col gap-1 select-all">
-                        <p><span className="text-gray-400">Name:</span> <span className="font-bold text-gray-900">{order.fullName}</span></p>
-                        <p className="truncate" title={order.fullAddressStr}><span className="text-gray-400">Addr:</span> <span className="font-bold text-gray-900">{order.fullAddressStr}</span></p>
-                        <p><span className="text-gray-400">Phone:</span> <span className="font-bold text-gray-900">{order.fullPhone}</span></p>
-                      </div>
-                    ) : (
-                      <p className="italic text-gray-400">Billing details hidden.</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="font-bold text-gray-400 uppercase text-[9px] mb-1">Diagnostic items</p>
-                    {order.revealed && !isDead ? (
-                      <div className="flex flex-col gap-1">
-                        <p><span className="text-gray-400">Bank:</span> <span className="font-semibold text-gray-700">{order.bank}</span></p>
-                        <p><span className="text-gray-400">SSN:</span> <span className="font-mono text-gray-900 font-bold">{order.fullSsn || 'NOT INCLUDED'}</span></p>
-                        <p><span className="text-gray-400">DOB:</span> <span className="font-mono text-gray-900 font-bold">{order.fullDob || 'NOT INCLUDED'}</span></p>
-                      </div>
-                    ) : (
-                      <p className="italic text-gray-400">Diagnostic variables hidden.</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="border-t pt-3 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleToggleReveal(order.purchaseId)}
-                      disabled={isDead}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold px-3 py-1.5 border rounded cursor-pointer text-[10px] uppercase"
-                    >
-                      {order.revealed && !isDead ? 'Hide Credentials' : 'Reveal Credentials'}
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if (!order.revealed) {
-                          setOrders(prev => prev.map(o => {
-                            if (o.purchaseId === order.purchaseId) {
-                              return { ...o, revealed: true };
-                            }
-                            return o;
-                          }));
-                        }
-                        setSelectedDetailsOrder(order);
-                      }}
-                      disabled={isDead}
-                      className="bg-sky-50 hover:bg-sky-100 text-sky-700 font-extrabold px-3 py-1.5 border border-sky-200 rounded cursor-pointer text-[10px] uppercase flex items-center gap-1"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> View Details
-                    </button>
-
-                    {!isDead && (
+                  {/* Action buttons */}
+                  <div className="border-t pt-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => handleDownloadTxt(order)}
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-800 border rounded px-3 py-1.5 cursor-pointer flex items-center gap-1.5 text-[10px] font-bold"
-                        title="Download product details inside a TXT file"
+                        onClick={() => handleToggleReveal(order.purchaseId)}
+                        disabled={isDead}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold px-3 py-1.5 border rounded cursor-pointer text-[10px] uppercase"
                       >
-                        <Download className="w-3.5 h-3.5 text-gray-500" /> Download TXT
+                        {order.revealed && !isDead ? 'Hide Credentials' : 'Reveal Credentials'}
                       </button>
-                    )}
 
-                    {order.revealed && !isDead && (
                       <button
                         onClick={() => {
-                          const dump = order.category === 'banklogs'
-                            ? `Username: ${order.loginUsername || ''} | Password: ${order.loginPassword || ''}`
-                            : order.category === 'cashapp'
-                            ? `Username: ${order.cashappUsername || ''} | PIN: ${order.cashappPin || ''}`
-                            : order.category === 'paypal'
-                            ? `Email: ${order.paypalEmail || ''} | Password: ${order.paypalPassword || ''}`
-                            : order.category === 'rdp'
-                            ? `IP: ${order.rdpIp || ''} | Username: ${order.rdpUsername || ''} | Password: ${order.rdpPassword || ''}`
-                            : order.withoutCvv2
-                            ? `${order.track1 || ''}|${order.track2 || ''}`
-                            : `${order.fullCc.replace(/\s+/g, '')}|${order.expDate.replace('/', '|')}|${order.fullCvv}|${order.fullName}|${order.fullAddressStr}`;
-                          navigator.clipboard.writeText(dump);
-                          onAddToast('Copied credentials to clipboard!', 'success');
+                          if (!order.revealed) {
+                            setOrders(prev => prev.map(o => {
+                              if (o.purchaseId === order.purchaseId) {
+                                return { ...o, revealed: true };
+                              }
+                              return o;
+                            }));
+                          }
+                          setSelectedDetailsOrder(order);
                         }}
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-800 border rounded px-3 py-1.5 cursor-pointer flex items-center gap-1.5 text-[10px] font-bold"
+                        disabled={isDead}
+                        className="bg-sky-50 hover:bg-sky-100 text-sky-700 font-extrabold px-3 py-1.5 border border-sky-200 rounded cursor-pointer text-[10px] uppercase flex items-center gap-1"
                       >
-                        <FileCode className="w-3.5 h-3.5 text-gray-500" /> Copy Dump
+                        <Eye className="w-3.5 h-3.5" /> View Details
                       </button>
-                    )}
-                  </div>
 
-                  {hasTester && isUntested && !isDead && (
-                    <div>
-                      {checkingOrderId === order.purchaseId ? (
-                        <div className="flex items-center gap-1.5 text-gray-500 py-1 font-bold">
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#0c5460]" />
-                          <span>Contacting diagnostic tester API...</span>
-                        </div>
-                      ) : (
+                      {!isDead && (
                         <button
-                          onClick={() => handleTestCard(order.purchaseId)}
-                          className="bg-[#bee5eb] hover:bg-sky-200 text-gray-950 font-black px-4 py-1.5 border border-[#0c5460] rounded cursor-pointer uppercase text-[10px]"
+                          onClick={() => handleDownloadTxt(order)}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-800 border rounded px-3 py-1.5 cursor-pointer flex items-center gap-1.5 text-[10px] font-bold"
+                          title="Download product details inside a TXT file"
                         >
-                          Verify Validity (Test Card)
+                          <Download className="w-3.5 h-3.5 text-gray-500" /> Download TXT
+                        </button>
+                      )}
+
+                      {order.revealed && !isDead && (
+                        <button
+                          onClick={() => {
+                            const dump = order.category === 'banklogs'
+                              ? `Username: ${order.loginUsername || ''} | Password: ${order.loginPassword || ''}`
+                              : order.category === 'cashapp'
+                              ? `Username: ${order.cashappUsername || ''} | PIN: ${order.cashappPin || ''}`
+                              : order.category === 'paypal'
+                              ? `Email: ${order.paypalEmail || ''} | Password: ${order.paypalPassword || ''}`
+                              : order.category === 'rdp'
+                              ? `IP: ${order.rdpIp || ''} | Username: ${order.rdpUsername || ''} | Password: ${order.rdpPassword || ''}`
+                              : order.withoutCvv2
+                              ? `${order.track1 || ''}|${order.track2 || ''}`
+                              : `${order.fullCc.replace(/\s+/g, '')}|${order.expDate.replace('/', '|')}|${order.fullCvv}|${order.fullName}|${order.fullAddressStr}`;
+                            navigator.clipboard.writeText(dump);
+                            onAddToast('Copied credentials to clipboard!', 'success');
+                          }}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-800 border rounded px-3 py-1.5 cursor-pointer flex items-center gap-1.5 text-[10px] font-bold"
+                        >
+                          <FileCode className="w-3.5 h-3.5 text-gray-500" /> Copy Dump
                         </button>
                       )}
                     </div>
-                  )}
+
+                    {hasTester && isUntested && !isDead && (
+                      <div>
+                        {checkingOrderId === order.purchaseId ? (
+                          <div className="flex items-center gap-1.5 text-gray-500 py-1 font-bold">
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#0c5460]" />
+                            <span>Contacting diagnostic tester API...</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleTestCard(order.purchaseId)}
+                            className="bg-[#bee5eb] hover:bg-sky-200 text-gray-950 font-black px-4 py-1.5 border border-[#0c5460] rounded cursor-pointer uppercase text-[10px]"
+                          >
+                            Verify Validity (Test Card)
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       )}
 
@@ -641,177 +957,31 @@ export default function CartOrdersView({
                 <p><span className="font-bold text-gray-500 font-sans">Category:</span> <span className="text-gray-900 font-bold uppercase text-[10px] bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded ml-1 font-sans">{selectedDetailsOrder.category || 'card'}</span></p>
               </div>
 
-              {selectedDetailsOrder.category === 'banklogs' ? (
-                <div className="flex flex-col gap-3">
-                  <h4 className="font-bold border-b pb-1 text-gray-800 uppercase tracking-wide">🏦 Bank Log Credentials</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Bank Name</p>
-                      <p className="font-extrabold text-gray-900">{selectedDetailsOrder.bank}</p>
+              <div className="flex flex-col gap-3">
+                <h4 className="font-extrabold border-b pb-1 text-gray-800 uppercase tracking-wide flex items-center gap-1">
+                  🔑 Credentials & Credentials
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                  {renderOrderDetails(selectedDetailsOrder).map((field) => (
+                    <div key={field.key} className="bg-gray-50 p-2.5 rounded border border-gray-200 flex flex-col gap-1 select-all">
+                      <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wide">
+                        {field.label}
+                      </span>
+                      {field.key === 'paypalCookies' ? (
+                        <textarea
+                          readOnly
+                          value={field.value}
+                          className="w-full h-24 font-mono bg-white border border-gray-200 p-2 rounded text-[10px] resize-none select-all font-semibold mt-1"
+                        />
+                      ) : (
+                        <span className={`text-[12px] font-bold text-gray-950 select-all ${field.isMono ? 'font-mono' : ''}`}>
+                          {field.value}
+                        </span>
+                      )}
                     </div>
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Account Balance</p>
-                      <p className="font-extrabold text-emerald-700">${selectedDetailsOrder.bankBalance || 0}</p>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Account Type</p>
-                      <p className="font-bold text-gray-900">{selectedDetailsOrder.bankAccountType || 'Checking'}</p>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Access Type</p>
-                      <p className="font-bold text-gray-900">{selectedDetailsOrder.bankAccessType || 'Online Login'}</p>
-                    </div>
-                  </div>
-                  <div className="bg-amber-50 border border-amber-200 p-3 rounded flex flex-col gap-2 font-mono">
-                    <p className="font-bold text-amber-900 text-[10px]">🔒 Login Credentials:</p>
-                    <div className="flex justify-between items-center bg-white p-1.5 rounded border border-amber-100 text-[11px]">
-                      <span>Username: <span className="font-bold text-gray-900 select-all">{selectedDetailsOrder.loginUsername || 'N/A'}</span></span>
-                    </div>
-                    <div className="flex justify-between items-center bg-white p-1.5 rounded border border-amber-100 text-[11px]">
-                      <span>Password: <span className="font-bold text-gray-900 select-all">{selectedDetailsOrder.loginPassword || 'N/A'}</span></span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ) : selectedDetailsOrder.category === 'cashapp' ? (
-                <div className="flex flex-col gap-3">
-                  <h4 className="font-bold border-b pb-1 text-gray-800 uppercase tracking-wide">💸 CashApp Account Credentials</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Username ($Cashtag)</p>
-                      <p className="font-extrabold text-gray-900">{selectedDetailsOrder.cashappUsername}</p>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Balance</p>
-                      <p className="font-extrabold text-emerald-700">${selectedDetailsOrder.cashappBalance || 0}</p>
-                    </div>
-                  </div>
-                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded flex flex-col gap-2 font-mono">
-                    <p className="font-bold text-emerald-900 text-[10px]">🔒 Secure Credentials:</p>
-                    <p>Email: <span className="font-bold text-gray-900 select-all">{selectedDetailsOrder.cashappEmail || 'N/A'}</span></p>
-                    <p>Phone: <span className="font-bold text-gray-900 select-all">{selectedDetailsOrder.cashappPhone || 'N/A'}</span></p>
-                    <p>PIN: <span className="font-bold text-gray-900 select-all">{selectedDetailsOrder.cashappPin || 'N/A'}</span></p>
-                  </div>
-                </div>
-              ) : selectedDetailsOrder.category === 'paypal' ? (
-                <div className="flex flex-col gap-3">
-                  <h4 className="font-bold border-b pb-1 text-gray-800 uppercase tracking-wide">💸 PayPal Log Credentials</h4>
-                  <div className="bg-gray-50 p-2 rounded border">
-                    <p className="font-bold text-gray-400 uppercase text-[9px]">Paypal Balance</p>
-                    <p className="font-extrabold text-emerald-700 text-sm">${selectedDetailsOrder.paypalBalance || 0}</p>
-                  </div>
-                  <div className="bg-amber-50 border border-amber-200 p-3 rounded flex flex-col gap-2 font-mono">
-                    <p className="font-bold text-amber-900 text-[10px]">🔒 Login Details:</p>
-                    <p>Email/Username: <span className="font-bold text-gray-900 select-all">{selectedDetailsOrder.paypalEmail || 'N/A'}</span></p>
-                    <p>Password: <span className="font-bold text-gray-900 select-all">{selectedDetailsOrder.paypalPassword || 'N/A'}</span></p>
-                  </div>
-                  {selectedDetailsOrder.paypalCookies && (
-                    <div className="flex flex-col gap-1">
-                      <p className="font-bold text-gray-500 uppercase text-[9px]">Cookies Session Code</p>
-                      <textarea
-                        readOnly
-                        value={selectedDetailsOrder.paypalCookies}
-                        className="w-full h-24 font-mono bg-gray-50 border p-2 rounded text-[10px] resize-none select-all font-semibold"
-                      />
-                    </div>
-                  )}
-                </div>
-              ) : selectedDetailsOrder.category === 'rdp' ? (
-                <div className="flex flex-col gap-3">
-                  <h4 className="font-bold border-b pb-1 text-gray-800 uppercase tracking-wide">🖥️ RDP Server Credentials</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">IP / Address</p>
-                      <p className="font-extrabold text-gray-900 font-mono">{selectedDetailsOrder.rdpIp}</p>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Location</p>
-                      <p className="font-bold text-gray-900">{selectedDetailsOrder.rdpCity || 'Chicago'}, {selectedDetailsOrder.rdpState || 'IL'}</p>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Operating System</p>
-                      <p className="font-bold text-gray-900">{selectedDetailsOrder.rdpOs || 'Windows 10'}</p>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Access Type</p>
-                      <p className="font-bold text-gray-900">{selectedDetailsOrder.rdpAccessType || 'Admin'}</p>
-                    </div>
-                  </div>
-                  <div className="bg-blue-50 border border-blue-200 p-3 rounded flex flex-col gap-2 font-mono">
-                    <p className="font-bold text-blue-900 text-[10px]">🔒 Login Details:</p>
-                    <p>Username: <span className="font-bold text-gray-900 select-all">{selectedDetailsOrder.rdpUsername || 'Administrator'}</span></p>
-                    <p>Password: <span className="font-bold text-gray-900 select-all">{selectedDetailsOrder.rdpPassword || 'N/A'}</span></p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <h4 className="font-bold border-b pb-1 text-gray-800 uppercase tracking-wide">💳 Credit Card Credentials</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50 p-2 rounded border">
-                      <p className="font-bold text-gray-400 uppercase text-[9px]">Card Number</p>
-                      <p className="font-extrabold text-gray-900 font-mono">{selectedDetailsOrder.fullCc}</p>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border grid grid-cols-2 gap-1">
-                      <div>
-                        <p className="font-bold text-gray-400 uppercase text-[9px]">Exp Date</p>
-                        <p className="font-bold text-gray-900 font-mono">{selectedDetailsOrder.expDate}</p>
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-400 uppercase text-[9px]">CVV Code</p>
-                        <p className="font-bold text-gray-900 font-mono">{selectedDetailsOrder.fullCvv}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <h4 className="font-bold border-b pb-1 text-gray-800 uppercase tracking-wide mt-2">👤 Billing Cardholder Info</h4>
-                  <div className="bg-gray-50 p-3 rounded border flex flex-col gap-2">
-                    <p><span className="font-bold text-gray-400 uppercase text-[9px]">Full Name:</span> <span className="font-bold text-gray-900">{selectedDetailsOrder.fullName}</span></p>
-                    <p><span className="font-bold text-gray-400 uppercase text-[9px]">Billing Address:</span> <span className="font-bold text-gray-900">{selectedDetailsOrder.fullAddressStr}</span></p>
-                    <p><span className="font-bold text-gray-400 uppercase text-[9px]">Phone Number:</span> <span className="font-bold text-gray-900">{selectedDetailsOrder.fullPhone}</span></p>
-                  </div>
-
-                  {(selectedDetailsOrder.fullSsn || selectedDetailsOrder.fullDob) && (
-                    <>
-                      <h4 className="font-bold border-b pb-1 text-gray-800 uppercase tracking-wide mt-2 font-sans">🔍 Additional SSN/DOB Details</h4>
-                      <div className="bg-gray-50 p-3 rounded border flex flex-col gap-2 font-mono">
-                        {selectedDetailsOrder.fullSsn && <p><span className="font-bold text-gray-400 uppercase text-[9px]">SSN:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullSsn}</span></p>}
-                        {selectedDetailsOrder.fullDob && <p><span className="font-bold text-gray-400 uppercase text-[9px]">DOB:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullDob}</span></p>}
-                      </div>
-                    </>
-                  )}
-
-                  {(selectedDetailsOrder.fullMmn || 
-                    selectedDetailsOrder.fullAtmPin || 
-                    selectedDetailsOrder.fullDriverLicense || 
-                    selectedDetailsOrder.fullEmail || 
-                    selectedDetailsOrder.fullAccountNumber || 
-                    selectedDetailsOrder.fullRoutingNumber ||
-                    selectedDetailsOrder.track1 ||
-                    selectedDetailsOrder.track2 ||
-                    selectedDetailsOrder.base) && (
-                    <>
-                      <h4 className="font-bold border-b pb-1 text-gray-800 uppercase tracking-wide mt-2 font-sans">📋 Extra Credentials & Uploaded Inputs</h4>
-                      <div className="bg-gray-50 p-3 rounded border flex flex-col gap-2 font-mono text-[11px]">
-                        {selectedDetailsOrder.fullMmn && <p><span className="font-bold text-gray-400 uppercase text-[9px]">MMN:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullMmn}</span></p>}
-                        {selectedDetailsOrder.fullAtmPin && <p><span className="font-bold text-gray-400 uppercase text-[9px]">ATM PIN:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullAtmPin}</span></p>}
-                        {selectedDetailsOrder.fullDriverLicense && <p><span className="font-bold text-gray-400 uppercase text-[9px]">Driver License:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullDriverLicense}</span></p>}
-                        {selectedDetailsOrder.fullEmail && (
-                          <p>
-                            <span className="font-bold text-gray-400 uppercase text-[9px]">Email Info:</span>{' '}
-                            <span className="font-bold text-gray-950">
-                              {selectedDetailsOrder.fullEmail} {selectedDetailsOrder.fullEmailPassword ? ` | Password: ${selectedDetailsOrder.fullEmailPassword}` : ''}
-                            </span>
-                          </p>
-                        )}
-                        {selectedDetailsOrder.fullAccountNumber && <p><span className="font-bold text-gray-400 uppercase text-[9px]">Account No:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullAccountNumber}</span></p>}
-                        {selectedDetailsOrder.fullRoutingNumber && <p><span className="font-bold text-gray-400 uppercase text-[9px]">Routing No:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.fullRoutingNumber}</span></p>}
-                        {selectedDetailsOrder.base && <p><span className="font-bold text-gray-400 uppercase text-[9px]">Base Pack:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.base}</span></p>}
-                        {selectedDetailsOrder.track1 && <p className="truncate" title={selectedDetailsOrder.track1}><span className="font-bold text-gray-400 uppercase text-[9px]">Track 1:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.track1}</span></p>}
-                        {selectedDetailsOrder.track2 && <p className="truncate" title={selectedDetailsOrder.track2}><span className="font-bold text-gray-400 uppercase text-[9px]">Track 2:</span> <span className="font-bold text-gray-950">{selectedDetailsOrder.track2}</span></p>}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+              </div>
 
               <div className="flex gap-2.5 mt-4 border-t pt-3">
                 <button

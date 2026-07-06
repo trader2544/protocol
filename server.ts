@@ -9,6 +9,13 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://placeholder-projec
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "placeholder-anon-key";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const isSupabaseConfigured = (): boolean => {
+  if (!supabaseUrl || !supabaseKey) return false;
+  if (supabaseUrl.includes('placeholder-project') || supabaseUrl.includes('YOUR_PROJECT_ID')) return false;
+  if (supabaseKey.includes('placeholder-anon-key') || supabaseKey.includes('YOUR_ACTUAL_SUPABASE_ANON_KEY') || supabaseKey.includes('YOUR_ACTUAL_SUPABASE_SERVICE_ROLE')) return false;
+  return true;
+};
+
 export const app = express();
 const PORT = 3000;
 
@@ -64,7 +71,7 @@ app.post("/api/nowpayments/create", async (req, res) => {
     console.log("NOWPayments payment created successfully:", data);
 
     // Write pending payment to Supabase if database is configured
-    const isConfigured = supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co" && supabaseKey && supabaseKey !== "placeholder-anon-key";
+    const isConfigured = isSupabaseConfigured();
     if (isConfigured) {
       try {
         const { error } = await supabase
@@ -136,7 +143,7 @@ app.get("/api/nowpayments/status/:payment_id", async (req, res) => {
     }
 
     let credited = false;
-    const isConfigured = supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co" && supabaseKey && supabaseKey !== "placeholder-anon-key";
+    const isConfigured = isSupabaseConfigured();
 
     console.log(`NOWPayments status for ${payment_id}: ${paymentStatus}. Email associated: ${email}`);
 
@@ -277,7 +284,7 @@ app.post("/api/nowpayments/ipn", async (req, res) => {
     console.log(`[IPN Webhook] Verified payment ${payment_id} status: ${verifiedStatus}. User: ${email}`);
 
     if ((verifiedStatus === "finished" || verifiedStatus === "confirmed") && email) {
-      const isConfigured = supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co" && supabaseKey && supabaseKey !== "placeholder-anon-key";
+      const isConfigured = isSupabaseConfigured();
       
       if (isConfigured) {
         const { data: payRecord } = await supabase
@@ -369,7 +376,7 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {

@@ -7,9 +7,23 @@ interface CardTableProps {
   cart: CardItem[];
   onAddToCart: (card: CardItem) => void;
   activeTab: string;
+  accountStatus?: string;
 }
 
-export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardTableProps) {
+const BlurredContent = ({ children, active }: { children: React.ReactNode; active: boolean }) => {
+  if (active) return <>{children}</>;
+  return (
+    <span 
+      className="blur-[4px] opacity-65 select-none pointer-events-none inline-block bg-gray-200/40 px-1 rounded-xs" 
+      title="Deposit $20+ to activate and unlock"
+    >
+      {children}
+    </span>
+  );
+};
+
+export default function CardTable({ cards, cart, onAddToCart, activeTab, accountStatus = 'active' }: CardTableProps) {
+  const userActive = accountStatus === 'active';
   const isCardInCart = (cardId: string) => cart.some(item => item.id === cardId);
 
   const getCountryEmoji = (code: string) => {
@@ -78,7 +92,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
     return (
       <div className="bg-white border border-gray-300 rounded-sm p-8 text-center text-gray-500 shadow-2xs select-text">
         <ShieldAlert className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-        <span className="font-bold text-gray-700 text-sm block">No cards found matching filters.</span>
+        <span className="font-bold text-gray-700 text-sm block">No matching products found.</span>
         <span className="text-xs">Adjust your search criteria above or reset filters to load items.</span>
       </div>
     );
@@ -88,7 +102,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
   if (activeTab === 'fullz') {
     return (
       <div className="bg-white border border-gray-300 rounded-sm shadow-xs overflow-hidden select-text text-[11px]">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[600px] border-b border-gray-200">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold h-[40px] select-none text-[11px]">
@@ -108,17 +122,23 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                 // Ensure nice fallback values for mock data representation
                 const flag = getCountryEmoji(card.country);
                 const countryName = getCountryName(card.country);
-                const fullName = card.fullName || getStableValue(card.id, idx, ['SHANTEL', 'KAREN', 'ROBERT', 'JAMES', 'PATRICIA', 'ELIZABETH', 'JENNIFER', 'LINDA']) + ' ***';
-                const city = getStableValue(card.id, idx + 1, ['Queens Village', 'Los Angeles', 'Miami', 'Brooklyn', 'Chicago', 'Houston', 'Atlanta']);
-                const zipStr = card.zip || getStableValue(card.id, idx + 2, ['11427-2923', '90012-3011', '33101-4452', '11201-1123', '60601-2093']);
                 const baseName = card.base || '1231_FULLZ_SSN_DOB_DLN_STATE_ZIP';
 
-                // Red/green text style helper
-                const renderYesNo = (val: boolean | string) => {
-                  const isYes = val === true || val === 'yes' || val === 'Own' || val === 'Rent';
+                // Determine masked name and details dynamically
+                const fullNameRaw = card.fullName || getStableValue(card.id, idx, ['SHANTEL', 'KAREN', 'ROBERT', 'JAMES', 'PATRICIA', 'ELIZABETH', 'JENNIFER', 'LINDA']) + ' SMITH';
+                const parts = fullNameRaw.split(' ');
+                const fullName = (parts[0] || 'KAREN') + ' ***';
+                
+                const city = getStableValue(card.id, idx + 1, ['Queens Village', 'Los Angeles', 'Miami', 'Brooklyn', 'Chicago', 'Houston', 'Atlanta']);
+                const zipRaw = card.zip || getStableValue(card.id, idx + 2, ['11427-2923', '90012-3011', '33101-4452', '11201-1123', '60601-2093']);
+                const zipStr = zipRaw.substring(0, 3) + '**';
+
+                // Red/green text style helper with xxxx masking
+                const renderMaskedYesNo = (val: boolean | string | undefined, maskText: string = 'yes') => {
+                  const isYes = val === true || val === 'yes' || (typeof val === 'string' && val.trim() !== '' && val.toLowerCase() !== 'no');
                   return (
                     <span className={isYes ? "text-green-600 font-extrabold" : "text-red-500 font-bold"}>
-                      {val === true ? 'yes' : val === false ? 'no' : String(val).toLowerCase()}
+                      {isYes ? maskText : 'no'}
                     </span>
                   );
                 };
@@ -129,33 +149,33 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                       <input type="checkbox" className="rounded-sm" />
                     </td>
                     <td className="p-2 border-r border-gray-200 leading-relaxed font-sans min-w-[240px]">
-                      <div>Name: <span className="font-bold text-gray-900">{fullName}</span></div>
+                      <div>Name: <span className="font-bold text-gray-900"><BlurredContent active={userActive}>{fullName}</BlurredContent></span></div>
                       <div className="flex items-center gap-1">
-                        city/zip: <span className="inline-block shrink-0">{flag}</span> {countryName}, {card.state || 'NY'}, {city} , {zipStr}
+                        city/zip: <span className="inline-block shrink-0">{flag}</span> {countryName}, {card.state || 'NY'}, <BlurredContent active={userActive}>{city} , {zipStr}</BlurredContent>
                       </div>
-                      <div>full address: {renderYesNo(card.fullAddress)}</div>
-                      <div>phone: {renderYesNo(card.phone)}</div>
-                      <div>email: {renderYesNo(card.email)}</div>
+                      <div>full address: <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullAddressStr || card.fullAddress, 'yes')}</BlurredContent></div>
+                      <div>phone: <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullPhone || card.phone, 'yes')}</BlurredContent></div>
+                      <div>email: <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullEmail || card.email, 'yes')}</BlurredContent></div>
                     </td>
                     <td className="p-2 border-r border-gray-200 leading-relaxed font-sans min-w-[180px]">
-                      <div>Own/Rent: {renderYesNo(card.fullAddress ? 'Own' : 'no')}</div>
-                      <div>Years At Residence: {renderYesNo(false)}</div>
-                      <div>Income Type: {renderYesNo(false)}</div>
-                      <div>Employer: {renderYesNo(false)}</div>
-                      <div>Occupation: {renderYesNo(false)}</div>
-                      <div>Years Employed: {renderYesNo(false)}</div>
-                      <div>Work Phone: {renderYesNo(false)}</div>
-                      <div>Net Monthly Income: {renderYesNo(false)}</div>
+                      <div>Own/Rent: <BlurredContent active={userActive}>{renderMaskedYesNo(card.ownRent || card.fullAddress, card.ownRent || 'yes')}</BlurredContent></div>
+                      <div>Years At Residence: <BlurredContent active={userActive}>{renderMaskedYesNo(card.yearsAtResidence, 'yes')}</BlurredContent></div>
+                      <div>Income Type: <BlurredContent active={userActive}>{renderMaskedYesNo(card.incomeType, card.incomeType || 'yes')}</BlurredContent></div>
+                      <div>Employer: <BlurredContent active={userActive}>{renderMaskedYesNo(card.employer, 'yes')}</BlurredContent></div>
+                      <div>Occupation: <BlurredContent active={userActive}>{renderMaskedYesNo(card.occupation, card.occupation || 'yes')}</BlurredContent></div>
+                      <div>Years Employed: <BlurredContent active={userActive}>{renderMaskedYesNo(card.yearsEmployed, 'yes')}</BlurredContent></div>
+                      <div>Work Phone: <BlurredContent active={userActive}>{renderMaskedYesNo(card.workPhone, 'yes')}</BlurredContent></div>
+                      <div>Net Monthly Income: <BlurredContent active={userActive}>{renderMaskedYesNo(card.netMonthlyIncome, 'yes')}</BlurredContent></div>
                     </td>
                     <td className="p-2 border-r border-gray-200 leading-relaxed font-sans min-w-[180px]">
-                      <div>Credit Card: {renderYesNo(false)}</div>
-                      <div>Checking Account: {renderYesNo(false)}</div>
-                      <div>SSN: {renderYesNo(card.ssn)}</div>
-                      <div>DOB: {renderYesNo(card.dob)}</div>
-                      <div>MMN: {renderYesNo(card.mmn)}</div>
-                      <div>Driver License ({card.state || 'NY'}): {renderYesNo(card.driverLicense)}</div>
-                      <div>Account: {renderYesNo(card.accountNumber || false)}</div>
-                      <div>Routing: {renderYesNo(card.routingNumber || false)}</div>
+                      <div>Credit Card: <BlurredContent active={userActive}>{renderMaskedYesNo(card.cardNumber, 'yes')}</BlurredContent></div>
+                      <div>Checking Account: <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullAccountNumber || card.accountNumber, 'yes')}</BlurredContent></div>
+                      <div>SSN: <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullSsn || card.ssn, 'xxx-xx-xxxx')}</BlurredContent></div>
+                      <div>DOB: <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullDob || card.dob, 'xx/xx/xxxx')}</BlurredContent></div>
+                      <div>MMN: <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullMmn || card.mmn, 'yes')}</BlurredContent></div>
+                      <div>Driver License ({card.state || 'NY'}): <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullDriverLicense || card.driverLicense, 'yes')}</BlurredContent></div>
+                      <div>Account: <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullAccountNumber || card.accountNumber, 'yes')}</BlurredContent></div>
+                      <div>Routing: <BlurredContent active={userActive}>{renderMaskedYesNo(card.fullRoutingNumber || card.routingNumber, 'yes')}</BlurredContent></div>
                     </td>
                     <td className="p-2 border-r border-gray-200 font-mono text-gray-500 font-medium min-w-[150px]">
                       {baseName}
@@ -180,7 +200,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
   if (activeTab === 'cvv2') {
     return (
       <div className="bg-white border border-gray-300 rounded-sm shadow-xs overflow-hidden select-text text-[11px]">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[600px] border-b border-gray-200">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold h-[40px] select-none text-[11px]">
@@ -243,14 +263,14 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                       {card.expDate}
                     </td>
                     <td className="p-2 border-r border-gray-200 font-bold text-gray-800">
-                      {fullName}
+                      <BlurredContent active={userActive}>{fullName}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 flex items-center gap-1 h-[45px]">
                       <span className="shrink-0">{flag}</span>
                       <span>{countryName}</span>
                     </td>
                     <td className="p-2 border-r border-gray-200 font-mono font-semibold text-gray-800">
-                      {card.state || '-'}
+                      <BlurredContent active={userActive}>{card.state || '-'}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 text-center">
                       <span className={card.fullAddress ? "text-green-600 font-extrabold" : "text-red-500 font-bold"}>
@@ -258,13 +278,15 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                       </span>
                     </td>
                     <td className="p-2 border-r border-gray-200 font-mono text-gray-500">
-                      {zipMasked}
+                      <BlurredContent active={userActive}>{zipMasked}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 text-gray-500 font-semibold text-[10px]">
                       {extras.join(' ')}
                     </td>
                     <td className="p-2 border-r border-gray-200 min-w-[150px]">
-                      <span className="font-semibold text-gray-800">{card.bank}</span>;{' '}
+                      <span className="font-semibold text-gray-800">
+                        <BlurredContent active={userActive}>{card.bank}</BlurredContent>
+                      </span>;{' '}
                       <span className={card.onlyRefundable ? "text-green-600 font-bold text-[10px]" : "text-red-500 font-bold text-[10px]"}>
                         {card.onlyRefundable ? 'replaceable' : 'not replaceable'}
                       </span>
@@ -292,7 +314,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
   if (activeTab === 'banklogs') {
     return (
       <div className="bg-white border border-gray-300 rounded-sm shadow-xs overflow-hidden select-text text-[11px]">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[600px] border-b border-gray-200">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold h-[40px] select-none text-[11px]">
@@ -324,7 +346,9 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                       <input type="checkbox" className="rounded-sm" />
                     </td>
                     <td className="p-2 border-r border-gray-200 leading-tight">
-                      <div className="font-bold text-gray-900">{bankName}</div>
+                      <div className="font-bold text-gray-900">
+                        <BlurredContent active={userActive}>{bankName}</BlurredContent>
+                      </div>
                       <div className="text-gray-500 flex items-center gap-1 text-[10px]">
                         <span>{flag}</span> {countryName} {card.state ? `, ${card.state}` : ''}
                       </div>
@@ -333,10 +357,10 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                       {accType}
                     </td>
                     <td className="p-2 border-r border-gray-200 font-mono font-bold text-green-600 text-xs">
-                      {balance}
+                      <BlurredContent active={userActive}>{balance}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 text-gray-600 font-semibold">
-                      {access}
+                      <BlurredContent active={userActive}>{access}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 font-mono text-gray-500 font-semibold">
                       {baseName}
@@ -361,7 +385,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
   if (activeTab === 'cashapp') {
     return (
       <div className="bg-white border border-gray-300 rounded-sm shadow-xs overflow-hidden select-text text-[11px]">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[600px] border-b border-gray-200">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold h-[40px] select-none text-[11px]">
@@ -380,12 +404,28 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
             </thead>
             <tbody className="divide-y divide-gray-200 font-sans text-gray-700">
               {cards.map((card, idx) => {
-                const username = card.cashappUsername || `$user_${card.id.substring(0, 4)}`;
-                const email = card.cashappEmail || 'hidden_email@domain.com';
-                const phone = card.cashappPhone || '+1 *** *** ****';
+                const rawUsername = card.cashappUsername || `$user_${card.id.substring(0, 4)}`;
+                const username = rawUsername.startsWith('$')
+                  ? '$' + (rawUsername.slice(1).length > 3 ? rawUsername.slice(1, 4) + 'xxx' : 'xxx')
+                  : (rawUsername.length > 3 ? rawUsername.slice(0, 3) + 'xxx' : 'xxx');
+                
+                const rawEmail = card.cashappEmail || 'hidden_email@domain.com';
+                const emailParts = rawEmail.split('@');
+                const email = emailParts.length < 2
+                  ? (rawEmail.length > 3 ? rawEmail.slice(0, 3) + 'xxx' : 'xxx')
+                  : `${emailParts[0].length > 3 ? emailParts[0].slice(0, 3) + 'xxx' : 'xxx'}@${emailParts[1].length > 3 ? emailParts[1].slice(0, 3) + 'xxx' : 'xxx'}`;
+
+                const rawPhone = card.cashappPhone || '+15550199';
+                const phone = rawPhone.length > 5 ? rawPhone.slice(0, 5) + 'xxx' : 'xxx';
+
+                const rawPassword = card.loginPassword || 'password123';
+                const maskedPassword = rawPassword.length > 3 ? rawPassword.slice(0, 3) + 'xxx' : 'xxx';
+
                 const hasFunds = card.cashappHasFunds !== false;
                 const balance = card.cashappBalance !== undefined ? `$${card.cashappBalance.toFixed(2)}` : '$0.00';
-                const pin = card.cashappPin || 'Included';
+                
+                const rawPin = card.cashappPin || '1234';
+                const pin = rawPin.length > 2 ? rawPin.slice(0, 2) + 'xxx' : 'xxx';
                 const baseName = card.base || 'BASE_CASH_MOBILE';
 
                 return (
@@ -394,11 +434,18 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                       <input type="checkbox" className="rounded-sm" />
                     </td>
                     <td className="p-2 border-r border-gray-200 font-mono font-bold text-emerald-700">
-                      {username}
+                      <BlurredContent active={userActive}>{username}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 leading-tight">
-                      <div className="text-gray-800 font-semibold">{email}</div>
-                      <div className="text-gray-500 text-[10px] font-mono">{phone}</div>
+                      <div className="text-gray-800 font-semibold">
+                        Email: <BlurredContent active={userActive}>{email}</BlurredContent>
+                      </div>
+                      <div className="text-gray-500 text-[10px] font-mono">
+                        Phone: <BlurredContent active={userActive}>{phone}</BlurredContent>
+                      </div>
+                      <div className="text-gray-500 text-[10px] font-mono">
+                        Password: <BlurredContent active={userActive}>{maskedPassword}</BlurredContent>
+                      </div>
                     </td>
                     <td className="p-2 border-r border-gray-200 text-center">
                       <span className={hasFunds ? "text-green-600 font-extrabold" : "text-red-500 font-bold"}>
@@ -406,7 +453,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                       </span>
                     </td>
                     <td className="p-2 border-r border-gray-200 font-mono font-bold text-green-600 text-xs">
-                      {balance}
+                      <BlurredContent active={userActive}>{balance}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 text-center">
                       <span className="bg-gray-100 text-gray-700 font-mono font-bold px-1.5 py-0.5 rounded border border-gray-200">
@@ -436,7 +483,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
   if (activeTab === 'paypal') {
     return (
       <div className="bg-white border border-gray-300 rounded-sm shadow-xs overflow-hidden select-text text-[11px]">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[600px] border-b border-gray-200">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold h-[40px] select-none text-[11px]">
@@ -453,8 +500,13 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 font-sans text-gray-700">
-              {cards.map((card, idx) => {
-                const email = card.paypalEmail || 'hidden_paypal@domain.com';
+               {cards.map((card, idx) => {
+                const rawEmail = card.paypalEmail || 'hidden_paypal@domain.com';
+                const emailParts = rawEmail.split('@');
+                const email = emailParts.length < 2
+                  ? (rawEmail.length > 3 ? rawEmail.slice(0, 3) + 'xxx' : 'xxx')
+                  : `${emailParts[0].length > 3 ? emailParts[0].slice(0, 3) + 'xxx' : 'xxx'}@${emailParts[1].length > 3 ? emailParts[1].slice(0, 3) + 'xxx' : 'xxx'}`;
+
                 const hasPM = card.paypalHasPaymentMethod !== false;
                 const balance = card.paypalBalance !== undefined ? `$${card.paypalBalance.toFixed(2)}` : '$0.00';
                 const hasCookies = !!card.paypalCookies;
@@ -466,7 +518,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                       <input type="checkbox" className="rounded-sm" />
                     </td>
                     <td className="p-2 border-r border-gray-200 font-semibold text-blue-800 font-mono">
-                      {email}
+                      <BlurredContent active={userActive}>{email}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 text-center">
                       <span className={hasPM ? "text-green-600 font-extrabold" : "text-red-500 font-bold"}>
@@ -474,7 +526,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                       </span>
                     </td>
                     <td className="p-2 border-r border-gray-200 font-mono font-bold text-green-600 text-xs">
-                      {balance}
+                      <BlurredContent active={userActive}>{balance}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 text-center font-bold text-gray-600">
                       {hasCookies ? 'Cookies Included' : 'Login Credentials only'}
@@ -502,7 +554,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
   if (activeTab === 'rdp') {
     return (
       <div className="bg-white border border-gray-300 rounded-sm shadow-xs overflow-hidden select-text text-[11px]">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[600px] border-b border-gray-200">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold h-[40px] select-none text-[11px]">
@@ -536,10 +588,10 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                     </td>
                     <td className="p-2 border-r border-gray-200 flex items-center gap-1.5 font-bold text-gray-800 h-[45px]">
                       <span>{flag}</span>
-                      <span>{location}</span>
+                      <span><BlurredContent active={userActive}>{location}</BlurredContent></span>
                     </td>
                     <td className="p-2 border-r border-gray-200 font-mono font-bold text-gray-900 select-all">
-                      {ip}
+                      <BlurredContent active={userActive}>{ip}</BlurredContent>
                     </td>
                     <td className="p-2 border-r border-gray-200 font-semibold text-gray-600">
                       {os}
@@ -574,7 +626,7 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
   // --- RENDERING TABLE 3: DUMPS (`dump.html`) ---
   return (
     <div className="bg-white border border-gray-300 rounded-sm shadow-xs overflow-hidden select-text text-[11px]">
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[600px] border-b border-gray-200">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-100 border-b border-gray-300 text-gray-800 font-extrabold h-[40px] select-none text-[11px]">
@@ -639,17 +691,19 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab }: CardT
                     {card.zip ? 'yes' : '-'}
                   </td>
                   <td className="p-2 border-r border-gray-200 font-mono font-bold text-gray-700">
-                    {codeVal}
+                    <BlurredContent active={userActive}>{codeVal}</BlurredContent>
                   </td>
                   <td className="p-2 border-r border-gray-200 flex items-center gap-1 h-[45px]">
                     <span className="shrink-0">{flag}</span>
                     <span>{countryName}</span>
                   </td>
                   <td className="p-2 border-r border-gray-200 font-semibold text-gray-500">
-                    {card.fullAddressStr ? 'Yes' : 'N/A'}
+                    <BlurredContent active={userActive}>{card.fullAddressStr ? 'Yes' : 'N/A'}</BlurredContent>
                   </td>
                   <td className="p-2 border-r border-gray-200 min-w-[200px] leading-tight">
-                    <span className="font-semibold text-gray-800">{card.bank}</span>;{' '}
+                    <span className="font-semibold text-gray-800">
+                      <BlurredContent active={userActive}>{card.bank}</BlurredContent>
+                    </span>;{' '}
                     {card.country !== 'US' && (
                       <span className="inline-flex shrink-0 ml-1">{flag}</span>
                     )}

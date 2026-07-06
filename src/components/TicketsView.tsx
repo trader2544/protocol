@@ -14,6 +14,7 @@ interface TicketsViewProps {
   setIsTyping: React.Dispatch<React.SetStateAction<boolean>>;
   onCreateTicket: (subject: string, initialMsg: string) => void;
   onSendMessage: (ticketId: string, message: string, sender: 'user' | 'admin') => void;
+  telegramUsername?: string;
 }
 
 export default function TicketsView({
@@ -28,12 +29,15 @@ export default function TicketsView({
   setIsTyping,
   onCreateTicket,
   onSendMessage,
+  telegramUsername = '@protocolcc_bot',
 }: TicketsViewProps) {
   const [openingNewTicket, setOpeningNewTicket] = useState(false);
   const [newSubject, setNewSubject] = useState('');
   const [newInitialMsg, setNewInitialMsg] = useState('');
 
   const activeTicket = tickets.find(t => t.id === currentTicketId);
+
+  const cleanTg = telegramUsername.replace('@', '').trim();
 
   const handleOpenTicketSubmit = () => {
     if (!newSubject.trim() || !newInitialMsg.trim()) {
@@ -69,12 +73,12 @@ export default function TicketsView({
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <a
-            href="https://t.me/mariafq"
+            href={`https://t.me/${cleanTg}`}
             target="_blank"
             rel="noreferrer"
             className="bg-[#24a1de] hover:bg-[#1a82b4] text-white px-3 py-1.5 rounded font-extrabold text-[10px] uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all text-center"
           >
-            ✈️ Escalation Support (@mariafq)
+            ✈️ Escalation Support (@{cleanTg})
           </a>
           <a
             href="https://t.me/+HWRd8CbPTjU0YTU0"
@@ -212,7 +216,7 @@ export default function TicketsView({
                 >
                   <div className="flex items-center gap-1.5 mb-1 flex-wrap text-[10px] font-bold text-gray-400">
                     <span className={m.sender === 'user' ? 'text-blue-700 ml-auto' : 'text-zinc-600'}>
-                      {m.sender === 'user' ? 'Customer Profile' : '🛡️ Protocol Administrator'}
+                      {m.sender === 'user' ? 'Customer Profile' : '🛡️ @protocolcc_bot'}
                     </span>
                     <span>•</span>
                     <span className="font-mono">{m.timestamp}</span>
@@ -224,12 +228,12 @@ export default function TicketsView({
               ))}
 
               {isTyping && (
-                <div className="bg-zinc-50 border border-zinc-200 rounded p-2.5 self-start text-left max-w-[120px]">
+                <div className="bg-zinc-50 border border-zinc-200 rounded p-2.5 self-start text-left max-w-[150px]">
                   <div className="flex items-center gap-1">
                     <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" />
                     <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce delay-100" />
                     <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce delay-200" />
-                    <span className="text-[9px] text-gray-400 font-bold ml-1">Admin typing...</span>
+                    <span className="text-[9px] text-gray-400 font-bold ml-1">@protocolcc_bot typing...</span>
                   </div>
                 </div>
               )}

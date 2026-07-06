@@ -24,7 +24,7 @@ create table if not exists public.profiles (
   add_funds_open boolean not null default false,
   lottery_open boolean not null default false,
   gift_open boolean not null default false,
-  account_status text not null default 'active',
+  account_status text not null default 'inactive',
   creation_date timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -275,6 +275,14 @@ create table if not exists public.fullz (
   full_email_password text,
   full_account_number text,
   full_routing_number text,
+  own_rent text,
+  years_at_residence text,
+  income_type text,
+  employer text,
+  occupation text,
+  years_employed text,
+  work_phone text,
+  net_monthly_income text,
   status text not null default 'live', -- 'live' | 'sold'
   sold_to text, -- email of buyer
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -567,12 +575,14 @@ create table if not exists public.system_settings (
   btc_address text not null,
   ltc_address text not null,
   eth_address text not null default '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-  usdt_address text not null
+  usdt_address text not null,
+  telegram_username text not null default '@protocolcc_bot'
 );
 
 -- Ensure columns exist in case table was created in an older version
 alter table public.system_settings add column if not exists eth_address text not null default '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
 alter table public.system_settings add column if not exists usdt_address text not null default '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+alter table public.system_settings add column if not exists telegram_username text not null default '@protocolcc_bot';
 
 -- Enable RLS on system_settings
 alter table public.system_settings enable row level security;

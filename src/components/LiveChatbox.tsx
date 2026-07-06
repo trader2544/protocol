@@ -29,7 +29,7 @@ export default function LiveChatbox({ user }: LiveChatboxProps) {
     },
     {
       id: '2',
-      sender: 'mariafq',
+      sender: '@protocolcc_bot',
       role: 'admin',
       text: 'Thanks guys, support Telegram group is active for all bulk purchasers. Drop ticket if any issue.',
       timestamp: '18:34',
@@ -64,9 +64,9 @@ export default function LiveChatbox({ user }: LiveChatboxProps) {
 
       // Dynamic messages pool
       const mockReplies = [
-        { sender: 'ValidCheck_Bot', role: 'moderator' as const, text: '🔄 Automated Base Scan complete. Status: HIGH VALIDITY RATES detected across Visa/Mastercard.', color: 'bg-amber-600' },
+        { sender: '@protocolcc_bot', role: 'moderator' as const, text: '🔄 Automated Base Scan complete. Status: HIGH VALIDITY RATES detected across Visa/Mastercard.', color: 'bg-amber-600' },
         { sender: 'TonyStark_CVV', role: 'trader' as const, text: 'Deposit approved instantly. LTC is very fast tonight guys!', color: 'bg-blue-500' },
-        { sender: 'mariafq', role: 'admin' as const, text: 'Bases restock coming in 3 hours. Watch out for news alert!', color: 'bg-rose-500' },
+        { sender: '@protocolcc_bot', role: 'admin' as const, text: 'Bases restock coming in 3 hours. Watch out for news alert!', color: 'bg-rose-500' },
         { sender: 'Alpha_Dumps', role: 'trader' as const, text: 'Grabbed 10 fullz and got 9 good bins. Premium quality.', color: 'bg-cyan-500' },
         { sender: 'Xpress_Refunds', role: 'trader' as const, text: 'Refund for declined card took only 5 mins. Support is amazing here.', color: 'bg-indigo-500' }
       ];
@@ -126,22 +126,22 @@ export default function LiveChatbox({ user }: LiveChatboxProps) {
         `Welcome to the live shoutbox, @${userMsg.sender}! Drop a support ticket if you need any individual help.`,
         `Yo @${userMsg.sender}, make sure to check out the fresh live Auctions tab!`,
         `Welcome! We are currently checking valid rates. High quality dumps are live right now.`,
-        `Support is active. Telegram escalation is also available at https://t.me/mariafq.`
+        `Support is active. Telegram escalation is also available at https://t.me/protocolcc_bot.`
       ];
 
       const responseText = responses[Math.floor(Math.random() * responses.length)];
 
-      setMessages(prev => [
-        ...prev,
-        {
-          id: String(Date.now() + 1),
-          sender: 'mariafq',
-          role: 'admin',
-          text: responseText,
-          timestamp: replyTimeStr,
-          avatarColor: 'bg-rose-500'
-        }
-      ]);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: String(Date.now() + 1),
+            sender: '@protocolcc_bot',
+            role: 'admin',
+            text: responseText,
+            timestamp: replyTimeStr,
+            avatarColor: 'bg-rose-500'
+          }
+        ]);
     }, 2000);
   };
 

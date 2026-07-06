@@ -78,6 +78,14 @@ export interface CardItem {
   fullAccountNumber?: string;
   fullRoutingNumber?: string;
   category?: 'dumps' | 'cvv2' | 'fullz' | 'banklogs' | 'cashapp' | 'paypal' | 'rdp';
+  ownRent?: 'Own' | 'Rent' | '';
+  yearsAtResidence?: string;
+  incomeType?: string;
+  employer?: string;
+  occupation?: string;
+  yearsEmployed?: string;
+  workPhone?: string;
+  netMonthlyIncome?: string;
   loginUsername?: string;
   loginPassword?: string;
   bankBalance?: number;
@@ -103,6 +111,8 @@ export interface CardItem {
   rdpOs?: string;
   rdpAccessType?: string;
   rdpHospeed?: string;
+  packCount?: number;
+  cardsDetails?: string[];
 }
 
 export interface SupportTicket {
@@ -133,6 +143,7 @@ export interface WholesalePack {
   description: string;
   country: string;
   type: string;
+  cardsDetails?: string[];
 }
 
 export interface AuctionItem {
@@ -142,4 +153,11 @@ export interface AuctionItem {
   myBid: number;
   bidsCount: number;
   endTime: string; // ISO String
+  startingBid?: number;
+  highestBidder?: string;
+  winnerEmail?: string;
+  ended?: boolean;
+  cardsCount?: number;
+  cardsDetails?: string[];
+  biddersList?: { username: string; bidAmount: number; timestamp: string }[];
 }
