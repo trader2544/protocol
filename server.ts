@@ -73,7 +73,16 @@ app.post("/api/nowpayments/create", async (req, res) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error("NOWPayments API responded with error:", errText);
-      return res.status(response.status).json({ error: `NOWPayments error: ${errText}` });
+      let errMsg = errText;
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.message) {
+          errMsg = errJson.message;
+        }
+      } catch (e) {
+        // fallback to raw text if not JSON
+      }
+      return res.status(response.status).json({ error: `NOWPayments error: ${errMsg}` });
     }
 
     const data = await response.json();
@@ -139,7 +148,16 @@ app.get("/api/nowpayments/status/:payment_id", async (req, res) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error("NOWPayments status request failed:", errText);
-      return res.status(response.status).json({ error: `NOWPayments status check failed: ${errText}` });
+      let errMsg = errText;
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.message) {
+          errMsg = errJson.message;
+        }
+      } catch (e) {
+        // fallback to raw text if not JSON
+      }
+      return res.status(response.status).json({ error: `NOWPayments status check failed: ${errMsg}` });
     }
 
     const data = await response.json();
