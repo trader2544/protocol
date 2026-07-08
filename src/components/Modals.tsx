@@ -72,8 +72,15 @@ export default function Modals({ user, setUser, onAddFunds, onAddToast, paymentA
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to initialize payment');
+        const text = await res.text();
+        let errMsg = 'Failed to initialize payment';
+        try {
+          const parsed = JSON.parse(text);
+          errMsg = parsed.error || errMsg;
+        } catch (e) {
+          errMsg = `${res.status} ${res.statusText}: ${text.substring(0, 150)}`;
+        }
+        throw new Error(errMsg);
       }
 
       const data = await res.json();

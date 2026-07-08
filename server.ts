@@ -7,9 +7,18 @@ dotenv.config();
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://placeholder-project.supabase.co";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "placeholder-anon-key";
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+let supabase: any = null;
+try {
+  if (supabaseUrl && supabaseKey) {
+    supabase = createClient(supabaseUrl, supabaseKey);
+  }
+} catch (err) {
+  console.error("Failed to initialize Supabase client on startup:", err);
+}
 
 const isSupabaseConfigured = (): boolean => {
+  if (!supabase) return false;
   if (!supabaseUrl || !supabaseKey) return false;
   if (supabaseUrl.includes('placeholder-project') || supabaseUrl.includes('YOUR_PROJECT_ID')) return false;
   if (supabaseKey.includes('placeholder-anon-key') || supabaseKey.includes('YOUR_ACTUAL_SUPABASE_ANON_KEY') || supabaseKey.includes('YOUR_ACTUAL_SUPABASE_SERVICE_ROLE')) return false;
@@ -34,7 +43,7 @@ app.post("/api/nowpayments/create", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields: amount, pay_currency, email" });
     }
 
-    const apiKey = "AFZWGY8-T7V4SCJ-JSE4FE5-SW4SM3C";
+    const apiKey = process.env.NOWPAYMENTS_API_KEY || process.env.VITE_NOWPAYMENTS_API_KEY || "AFZWGY8-T7V4SCJ-JSE4FE5-SW4SM3C";
     
     // Determine host origin for IPN callback dynamically
     const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
@@ -117,7 +126,7 @@ app.get("/api/nowpayments/status/:payment_id", async (req, res) => {
       return res.status(400).json({ error: "Missing payment_id parameter" });
     }
 
-    const apiKey = "AFZWGY8-T7V4SCJ-JSE4FE5-SW4SM3C";
+    const apiKey = process.env.NOWPAYMENTS_API_KEY || process.env.VITE_NOWPAYMENTS_API_KEY || "AFZWGY8-T7V4SCJ-JSE4FE5-SW4SM3C";
     console.log(`Checking status for payment: ${payment_id}`);
 
     const response = await fetch(`https://api.nowpayments.io/v1/payment/${payment_id}`, {
@@ -259,7 +268,7 @@ app.post("/api/nowpayments/ipn", async (req, res) => {
     }
 
     // To guarantee safety from malicious calls, verify the details directly with NOWPayments API
-    const apiKey = "AFZWGY8-T7V4SCJ-JSE4FE5-SW4SM3C";
+    const apiKey = process.env.NOWPAYMENTS_API_KEY || process.env.VITE_NOWPAYMENTS_API_KEY || "AFZWGY8-T7V4SCJ-JSE4FE5-SW4SM3C";
     const verifyResponse = await fetch(`https://api.nowpayments.io/v1/payment/${payment_id}`, {
       method: "GET",
       headers: {
@@ -368,27 +377,41 @@ app.post("/api/nowpayments/ipn", async (req, res) => {
 
 // Startup logic
 async function startServer() {
-  // Serve Vite in development, static files in production
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else if (!process.env.VERCEL) {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
+  try {
+    // Serve Vite in development, static files in production
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        const { createServer: createViteServer } = await import("vite");
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: "spa",
+        });
+        app.use(vite.middlewares);
+      } catch (viteErr) {
+        console.error("Failed to load Vite dev server middleware. If this is a production environment, please set NODE_ENV=production.", viteErr);
+        // Fallback to static files
+        const distPath = path.join(process.cwd(), "dist");
+        app.use(express.static(distPath));
+        app.get("*", (req, res) => {
+          res.sendFile(path.join(distPath, "index.html"));
+        });
+      }
+    } else if (!process.env.VERCEL) {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
 
-  // Only start listening if NOT in a serverless environment like Vercel
-  if (!process.env.VERCEL) {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server is booted up on port ${PORT}`);
-    });
+    // Only start listening if NOT in a serverless environment like Vercel
+    if (!process.env.VERCEL) {
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server is booted up on port ${PORT}`);
+      });
+    }
+  } catch (err) {
+    console.error("Critical error during startServer execution:", err);
   }
 }
 

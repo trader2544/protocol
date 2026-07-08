@@ -28,6 +28,11 @@ export const isSupabaseConfigured = (): boolean => {
   return true;
 };
 
+// Check if an ID is a valid UUID
+export const isValidUUID = (id: string): boolean => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 // --- MAPPING HELPERS ---
 function mapProfileToTS(dbProfile: any): UserProfile & { role: 'admin' | 'customer' } {
   const isAdmin = dbProfile.email.toLowerCase() === 'patrickkamande10455@gmail.com';
@@ -1088,7 +1093,7 @@ export async function getCards(): Promise<CardItem[]> {
 }
 
 export async function updateCard(cardId: string, updates: Partial<CardItem>): Promise<CardItem> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(cardId)) {
     const cards = await getCards();
     const idx = cards.findIndex(c => c.id === cardId);
     if (idx !== -1) {
@@ -1276,7 +1281,7 @@ export async function addCard(card: Omit<CardItem, 'id'>): Promise<CardItem> {
 }
 
 export async function deleteCard(cardId: string): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(cardId)) {
     const cards = await getCards();
     const filtered = cards.filter(c => c.id !== cardId);
     localStorage.setItem('cards_list', JSON.stringify(filtered));
@@ -1372,7 +1377,7 @@ export async function addNewsItem(news: Omit<NewsItem, 'id'>): Promise<NewsItem>
 }
 
 export async function deleteNewsItem(newsId: string): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(newsId)) {
     const list = await getNews();
     const filtered = list.filter(n => n.id !== newsId);
     localStorage.setItem('news_list', JSON.stringify(filtered));
@@ -1391,7 +1396,7 @@ export async function deleteNewsItem(newsId: string): Promise<void> {
 }
 
 export async function updateNewsItem(newsId: string, updates: Partial<NewsItem>): Promise<NewsItem> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(newsId)) {
     const list = await getNews();
     const idx = list.findIndex(n => n.id === newsId);
     if (idx !== -1) {
@@ -1473,7 +1478,7 @@ export async function getWholesalePacks(): Promise<WholesalePack[]> {
 }
 
 export async function deleteWholesalePack(packId: string): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(packId)) {
     const list = await getWholesalePacks();
     const filtered = list.filter(p => p.id !== packId);
     localStorage.setItem('wholesale_list', JSON.stringify(filtered));
@@ -1492,7 +1497,7 @@ export async function deleteWholesalePack(packId: string): Promise<void> {
 }
 
 export async function updateWholesalePack(packId: string, updates: Partial<WholesalePack>): Promise<WholesalePack> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(packId)) {
     const list = await getWholesalePacks();
     const idx = list.findIndex(p => p.id === packId);
     if (idx !== -1) {
@@ -1617,7 +1622,7 @@ export async function getAuctions(): Promise<AuctionItem[]> {
 }
 
 export async function deleteAuctionItem(auctionId: string): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(auctionId)) {
     const list = await getAuctions();
     const filtered = list.filter(a => a.id !== auctionId);
     localStorage.setItem('auctions_list', JSON.stringify(filtered));
@@ -1636,7 +1641,7 @@ export async function deleteAuctionItem(auctionId: string): Promise<void> {
 }
 
 export async function updateAuctionItem(auctionId: string, updates: Partial<AuctionItem>): Promise<AuctionItem> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(auctionId)) {
     const list = await getAuctions();
     const idx = list.findIndex(a => a.id === auctionId);
     if (idx !== -1) {
@@ -1725,7 +1730,7 @@ export async function addAuctionItem(auction: Omit<AuctionItem, 'id'>): Promise<
 }
 
 export async function updateAuctionBid(auctionId: string, currentBid: number, bidsCount: number, myBid: number): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(auctionId)) {
     const list = await getAuctions();
     const idx = list.findIndex(a => a.id === auctionId);
     if (idx !== -1) {
@@ -1835,7 +1840,7 @@ export async function createTicket(ticket: Omit<SupportTicket, 'id'> & { userEma
 }
 
 export async function updateTicketMessages(ticketId: string, messages: any[], status: 'Open' | 'Closed' | 'Replied'): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(ticketId)) {
     // Search all local storage keys to find and update
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -1938,7 +1943,7 @@ export async function createOrder(order: any): Promise<void> {
 }
 
 export async function updateOrderTestStatus(orderId: string, testStatus: string): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(orderId)) {
     // Local storage fallback
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -2077,7 +2082,7 @@ export async function createPayment(payment: any): Promise<void> {
 }
 
 export async function updatePaymentStatus(paymentId: string, status: string): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !isValidUUID(paymentId)) {
     // Search all local storage payment lists to update
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
