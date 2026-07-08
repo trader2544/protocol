@@ -27,17 +27,70 @@ export default function CardTable({ cards, cart, onAddToCart, activeTab, account
   const isCardInCart = (cardId: string) => cart.some(item => item.id === cardId);
 
   const getCountryEmoji = (code: string) => {
+    if (!code) return '🌐';
+    const clean = code.trim().toUpperCase();
+
+    // Standard 2-letter codes or common variations
     const emojis: Record<string, string> = {
-      US: '🇺🇸',
-      CA: '🇨🇦',
-      GB: '🇬🇧',
-      DE: '🇩🇪',
-      FR: '🇫🇷',
-      AU: '🇦🇺',
-      IT: '🇮🇹',
-      ES: '🇪🇸',
+      US: '🇺🇸', USA: '🇺🇸', "UNITED STATES": '🇺🇸', "UNITED STATES OF AMERICA": '🇺🇸',
+      CA: '🇨🇦', CANADA: '🇨🇦',
+      GB: '🇬🇧', UK: '🇬🇧', "UNITED KINGDOM": '🇬🇧', "GREAT BRITAIN": '🇬🇧',
+      DE: '🇩🇪', GERMANY: '🇩🇪',
+      FR: '🇫🇷', FRANCE: '🇫🇷',
+      AU: '🇦🇺', AUSTRALIA: '🇦🇺',
+      IT: '🇮🇹', ITALY: '🇮🇹',
+      ES: '🇪🇸', SPAIN: '🇪🇸',
+      NL: '🇳🇱', NETHERLANDS: '🇳🇱',
+      BR: '🇧🇷', BRAZIL: '🇧🇷',
+      IN: '🇮🇳', INDIA: '🇮🇳',
+      CN: '🇨🇳', CHINA: '🇨🇳',
+      RU: '🇷🇺', RUSSIA: '🇷🇺',
+      JP: '🇯🇵', JAPAN: '🇯🇵',
+      CH: '🇨🇭', SWITZERLAND: '🇨🇭',
+      SE: '🇸🇪', SWEDEN: '🇸🇪',
+      NO: '🇳🇴', NORWAY: '🇳🇴',
+      FI: '🇫🇮', FINLAND: '🇫🇮',
+      DK: '🇩🇰', DENMARK: '🇩🇰',
+      IE: '🇮🇪', IRELAND: '🇮🇪',
+      BE: '🇧🇪', BELGIUM: '🇧🇪',
+      AT: '🇦🇹', AUSTRIA: '🇦🇹',
+      PL: '🇵🇱', POLAND: '🇵🇱',
+      UA: '🇺🇦', UKRAINE: '🇺🇦',
+      MX: '🇲🇽', MEXICO: '🇲🇽',
+      ZA: '🇿🇦', "SOUTH AFRICA": '🇿🇦',
+      NZ: '🇳🇿', "NEW ZEALAND": '🇳🇿',
+      SG: '🇸🇬', SINGAPORE: '🇸🇬',
+      HK: '🇭🇰', "HONG KONG": '🇭🇰',
+      AE: '🇦🇪', UAE: '🇦🇪', "UNITED ARAB EMIRATES": '🇦🇪',
+      TR: '🇹🇷', TURKEY: '🇹🇷',
+      KR: '🇰🇷', "SOUTH KOREA": '🇰🇷', KOREA: '🇰🇷',
     };
-    return emojis[code.toUpperCase()] || '🌐';
+
+    if (emojis[clean]) {
+      return emojis[clean];
+    }
+
+    // Try a search match
+    for (const [key, value] of Object.entries(emojis)) {
+      if (clean.includes(key) && key.length > 2) {
+        return value;
+      }
+    }
+
+    // If it is a 2-letter code, generate standard regional indicator symbols dynamically
+    if (clean.length === 2) {
+      const charCode1 = clean.charCodeAt(0);
+      const charCode2 = clean.charCodeAt(1);
+      if (charCode1 >= 65 && charCode1 <= 90 && charCode2 >= 65 && charCode2 <= 90) {
+        try {
+          return String.fromCodePoint(127462 + charCode1 - 65, 127462 + charCode2 - 65);
+        } catch (e) {
+          // Fallback if fromCodePoint is unsupported or fails
+        }
+      }
+    }
+
+    return '🌐';
   };
 
   const getCountryName = (code: string) => {
