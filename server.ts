@@ -377,11 +377,16 @@ app.post("/api/nowpayments/ipn", async (req, res) => {
 
 // Startup logic
 async function startServer() {
+  if (process.env.VERCEL) {
+    // Vercel handles static routing and serverless function routing itself; we must not run dev server or listen
+    return;
+  }
   try {
     // Serve Vite in development, static files in production
     if (process.env.NODE_ENV !== "production") {
       try {
-        const { createServer: createViteServer } = await import("vite");
+        const viteModuleName = "vite";
+        const { createServer: createViteServer } = await import(viteModuleName);
         const vite = await createViteServer({
           server: { middlewareMode: true },
           appType: "spa",
@@ -396,7 +401,7 @@ async function startServer() {
           res.sendFile(path.join(distPath, "index.html"));
         });
       }
-    } else if (!process.env.VERCEL) {
+    } else {
       const distPath = path.join(process.cwd(), "dist");
       app.use(express.static(distPath));
       app.get("*", (req, res) => {
@@ -405,11 +410,9 @@ async function startServer() {
     }
 
     // Only start listening if NOT in a serverless environment like Vercel
-    if (!process.env.VERCEL) {
-      app.listen(PORT, "0.0.0.0", () => {
-        console.log(`Server is booted up on port ${PORT}`);
-      });
-    }
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server is booted up on port ${PORT}`);
+    });
   } catch (err) {
     console.error("Critical error during startServer execution:", err);
   }
